@@ -186,7 +186,6 @@ class VideoTranscriber:
                     if frame_count % 10 == 0:  # Update progress every 10 frames
                         progress = 70 + int(25 * (frame_count / total_frames))
                         session_id = os.environ.get('SESSION_ID', 'default_session')
-                        print(f"{session_id}|PROGRESS:{progress}%|Processing frame {frame_count}/{total_frames}")
 
                         sys.stdout.flush()
                     pbar.update(1)
@@ -195,7 +194,6 @@ class VideoTranscriber:
 
             cap.release()
             session_id = os.environ.get('SESSION_ID', 'default_session')
-            print(f"{session_id}|PROGRESS:95%|Finalizing video")
 
             sys.stdout.flush()
 
@@ -281,28 +279,22 @@ def put_subtitles(video_path, transcription_text=None, session_id=None):
         output_video_path = f"public/tmp/{session_id}/video_with_subtitles.mp4"  # Ensure output path uses session ID
         
         session_id = os.environ.get('SESSION_ID', 'default_session')
-        print(f"{session_id}|PROGRESS:10%|Initializing transcriber")
         sys.stdout.flush()
 
         sys.stdout.flush()
         transcriber = VideoTranscriber(model_path, video_path, transcription_text)
         
-        print(f"{session_id}|PROGRESS:25%|Extracting audio")
         sys.stdout.flush()
         transcriber.extract_audio()
-        
-        print(f"{session_id}|PROGRESS:40%|Transcribing video")
         sys.stdout.flush()
         transcriber.transcribe_video()
         
-        print(f"{session_id}|PROGRESS:60%|Creating subtitled video")
 
 
         sys.stdout.flush()
         transcriber.create_video(output_video_path)
 
         
-        print('\n=== Subtitles added successfully! ===')
         print(f"Output video: {output_video_path}")
 
         return output_video_path

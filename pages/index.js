@@ -10,18 +10,30 @@ const darkTheme = {
   text: 'text-gray-100',
   card: 'bg-gray-800',
   input: 'bg-gray-700 text-white',
-  button: 'bg-blue-600', // Set button color to blue
+  button: 'bg-blue-600',
   footer: 'bg-gray-800'
 };
 
 export default function Home() {
   const [file, setFile] = useState(null);
   const [sessionId, setSessionId] = useState(Date.now().toString(36) + Math.random().toString(36).substring(2));
-  const [fileName, setFileName] = useState(''); // State for file n
-  const [isUploading, setIsUploading] = useState(false); // State to track upload status
-  const [processingStatus, setProcessingStatus] = useState('idle'); // 'idle' | 'processing' | 'ready' | 'error'
-  const [processedVideoPath, setProcessedVideoPath] = useState(''); // Path to processed video
-  const [errorMessage, setErrorMessage] = useState(''); // Store processing errors
+  const [fileName, setFileName] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState('idle');
+  const [processedVideoPath, setProcessedVideoPath] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isAddingSubtitles, setIsAddingSubtitles] = useState(false);
+  const [checkInterval, setCheckInterval] = useState(null);
+  const [isDownloadComplete, setIsDownloadComplete] = useState(false);
+  const [fileDetectedTime, setFileDetectedTime] = useState(null);
+
+  useEffect(() => {
+    return () => {
+      if (checkInterval) {
+        clearInterval(checkInterval);
+      }
+    };
+  }, [checkInterval]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -33,62 +45,51 @@ export default function Home() {
     try {
       const data = new FormData();
       data.set('file', file);
-      data.set('sessionId', sessionId); // Include session ID in the form data
-      setIsUploading(true); // Set uploading state to true
-      setProcessingStatus('processing'); // Set processing state
-      const processedPath = "public/tmp/"+sessionId+"/video_with_subtitles.mp4" 
-      console.log("processed video path = ", processedPath) // Use processedPath instead
+      data.set('sessionId', sessionId);
+      setIsUploading(true);
+      setProcessingStatus('processing');
+      const processedPath = "public/tmp/"+sessionId+"/video_with_subtitles.mp4"
       setProcessedVideoPath(processedPath)
 
       const res = await fetch('/api/upload', {
         headers: {
-          'X-Session-Id': sessionId, // Include session ID in the request headers
+          'X-Session-Id': sessionId,
         },
         method: 'POST',
         body: data
       });
 
-      console.log(sessionId)
-
-      // Start polling for processing status
-      const interval = setInterval(async () => {
-        try {
-          const statusRes = await fetch(`/api/processing-status?sessionId=${sessionId}`);
-          if (statusRes.ok) {
-            const { status } = await statusRes.json();
-            setProcessingStatus(status);
-            
-            if (status === 'ready') {
-              clearInterval(interval);
-              setProcessedVideoPath(`/api/download?sessionId=${sessionId}`);
-            }
-            
-            if (status === 'error') {
-              clearInterval(interval);
-              setErrorMessage('Video processing failed - please try again');
-            }
-          }
-        } catch (error) {
-          console.error('Error checking processing status:', error);
-          clearInterval(interval);
-          setProcessingStatus('error');
-          setErrorMessage('Failed to check processing status');
-        }
-      }, 2000);
-
-      // Wait for processing to complete
-      const { outputPath } = await res.json(); // Ensure the output path is correctly retrieved
-
-      clearInterval(interval);
-      setProcessedVideoPath(outputPath);
-
       if (!res.ok) {
         throw new Error(await res.text());
       }
-      console.log('File uploaded successfully');
-      setFile(null); // Reset file input after upload
-      setIsUploading(false); // Reset uploading state
-      setFileName(''); // Reset file name after upload
+      
+      setIsUploading(false);
+      setIsAddingSubtitles(true);
+
+      const checkFileInterval = setInterval(async () => {
+        try {
+          const response = await fetch(`/tmp/${sessionId}/video_with_subtitles.mp4`);
+          if (response.ok) {
+            clearInterval(checkFileInterval);
+            setFileDetectedTime(Date.now());
+            setTimeout(() => {
+              setIsAddingSubtitles(false);
+              setProcessingStatus('ready');
+              setProcessedVideoPath(`/tmp/${sessionId}/video_with_subtitles.mp4`);
+              setIsUploading(false);
+            }, 15000);
+          }
+        } catch (error) {
+          console.log('Waiting for subtitles to be added...');
+        }
+      }, 1000);
+
+      return () => {
+        clearInterval(checkFileInterval);
+      };
+
+      setFile(null);
+      setFileName('');
     } catch (e) {
       console.error(e);
     }
@@ -128,7 +129,7 @@ export default function Home() {
       selectSubtitleColorLabel: "Seleccionar color de subtítulos",
       selectSubtitleSizeLabel: "Seleccionar tamaño de subtítulos",
       uploadButton: "Subir video",
-      livePreviewTitle: "Vista previa de subtítulos",
+      livePreviewTitle: "Vista previa of subtítulos",
       home: "Inicio",
       features: "Características",
       pricing: "Precios",
@@ -197,11 +198,11 @@ export default function Home() {
                   </label>
                   <div 
                     className={`w-full h-32 border-dashed border-2 border-gray-400 flex items-center justify-center ${darkTheme.input}`} 
-                    style={{ cursor: 'pointer' }} 
-                    onClick={() => !isProcessing && document.getElementById('videoInput').click()} 
+                    style={{ cursor: isAddingSubtitles ? 'not-allowed' : 'pointer' }} 
+                    onClick={() => !isAddingSubtitles && document.getElementById('videoInput').click()} 
                     onDrop={(e) => {
                       e.preventDefault();
-                      if (isProcessing) return;
+                      if (isAddingSubtitles) return;
                       const files = e.dataTransfer.files;
                       if (files.length > 0 && files[0].type.startsWith('video/')) {
                         setFile(files[0]);
@@ -213,7 +214,7 @@ export default function Home() {
                     onDragOver={(e) => e.preventDefault()}
                   >
                     <p className="text-gray-500">
-                      {file ? fileName : selectedLanguage.dragAndDropMessage}
+                      {isAddingSubtitles ? 'Processing...' : file ? fileName : selectedLanguage.dragAndDropMessage}
                     </p>
                   </div>
 
@@ -222,7 +223,7 @@ export default function Home() {
                     className={`${darkTheme.button} text-white bg-blue-600 hover:bg-blue-700 mt-2 px-4 py-2 md:px-6 md:py-3 rounded-full w-full`} 
                     id="chooseButton" 
                     onClick={() => processingStatus === 'idle' && document.getElementById('videoInput').click()} 
-                    style={{ display: !file ? 'block' : 'none' }} 
+                    style={{ display: (!file && !isUploading && !isAddingSubtitles && processingStatus === 'idle') || isDownloadComplete ? 'block' : 'none' }}
                     disabled={processingStatus !== 'idle'}
                   >
                     {selectedLanguage.selectVideoLabel}
@@ -247,32 +248,43 @@ export default function Home() {
                     disabled={processingStatus !== 'idle'}
                   />
 
-                  <button 
-                    type="button" 
-                    className={`${darkTheme.button} ${isUploading || processingStatus !== 'idle' ? 'bg-gray-400' : 'text-white bg-blue-600 hover:bg-blue-700'} mt-2 px-4 py-2 md:px-6 md:py-3 rounded-full w-full`} 
-                    id="uploadButton" 
-                    onClick={onSubmit} 
-                    style={{ display: file ? 'block' : 'none' }} 
-                    disabled={processingStatus !== 'idle' || isUploading || !file}
-                  >
-                    {isUploading ? (
-                      <>
-                        Uploading <img src="/spinning.gif" alt="Loading" className="inline-block w-4 h-4 animate-spin" />
-                      </>
-                    ) : (
-                      selectedLanguage.uploadButton
+                  <div className="space-y-4">
+                    <button 
+                      type="button" 
+                      className={`${darkTheme.button} ${isUploading || processingStatus !== 'idle' ? 'bg-gray-400' : 'text-white bg-blue-600 hover:bg-blue-700'} mt-2 px-4 py-2 md:px-6 md:py-3 rounded-full w-full`} 
+                      id="uploadButton" 
+                      onClick={onSubmit} 
+                      style={{ display: file && !isAddingSubtitles && processingStatus !== 'ready' ? 'block' : 'none' }} 
+
+                      disabled={processingStatus !== 'idle' || isUploading || !file}
+                    >
+                      {isUploading ? (
+                        <>
+                          Uploading <img src="/spinning.gif" alt="Loading" className="inline-block w-4 h-4 animate-spin duration-1000 ease-linear" />
+                        </>
+                      ) : (
+                        selectedLanguage.uploadButton
+                      )}
+                    </button>
+
+                    {isAddingSubtitles && (
+                      <div className="flex flex-col items-center justify-center mt-4">
+                        <img src="/spinning.gif" alt="Loading" className="w-16 h-16 animate-spin duration-1000 ease-linear" />
+                        <p className="text-gray-300 mt-2">
+                          {fileDetectedTime ? 'Finalizing video...' : 'Adding subtitles...'}
+                        </p>
+                      </div>
                     )}
-                  </button>
+                  </div>
 
                   <button 
                     type="button" 
                     className={`${darkTheme.button} text-white px-4 py-2 md:px-6 md:py-3 rounded-full w-full mt-auto`} 
                     id="downloadButton" 
+                    style={{ display: processingStatus === 'ready' ? 'block' : 'none' }}
                     onClick={async () => {
                       try {
                         const videoPath = `tmp/${sessionId}/video_with_subtitles.mp4`;
-                        
-                        // Trigger the download
                         const response = await fetch(videoPath);
                         if (!response.ok) {
                           console.error('Failed to fetch video:', response.statusText);
@@ -286,34 +298,35 @@ export default function Home() {
                         a.href = url;
                         a.download = 'video_with_subtitles.mp4';
                         
-                        // Start the download and wait for it to begin
                         await new Promise((resolve) => {
                           a.addEventListener('click', resolve, { once: true });
                           a.click();
                         });
                         
-                        // Clean up the URL
                         window.URL.revokeObjectURL(url);
-                        
-                        // Call cleanup endpoint
-                        const cleanupResponse = await fetch('/api/upload/cleanup', {
-                          method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/json',
-                          },
-                          body: JSON.stringify({ sessionId }),
-                        });
-                        
-                        if (!cleanupResponse.ok) {
-                          console.error('Failed to cleanup files:', cleanupResponse.statusText);
-                        }
-                        
-                        // Reset states after successful download and cleanup
                         setProcessingStatus('idle');
                         setFile(null);
                         setFileName('');
                         setProcessedVideoPath('');
+                        setIsDownloadComplete(true);
+
+                        await new Promise(resolve => setTimeout(resolve, 2000));
                         
+                        try {
+                          const cleanupResponse = await fetch('/api/upload/cleanup', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ sessionId }),
+                          });
+                          
+                          if (!cleanupResponse.ok) {
+                            console.error('Failed to cleanup files:', cleanupResponse.statusText);
+                          }
+                        } catch (cleanupError) {
+                          console.error('Error during cleanup:', cleanupError);
+                        }
                       } catch (error) {
                         console.error('Error during download and cleanup:', error);
                       }

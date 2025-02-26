@@ -18,16 +18,38 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Invalid file path' }, { status: 400 });
     }
 
-    try {
-      await fs.access(filePath);
-      await fs.rm(filePath, { recursive: true, force: true });
-      return NextResponse.json({ message: 'Directory deleted successfully' }, { status: 200 });
-    } catch (error) {
-      if (error.code === 'ENOENT') {
-        return NextResponse.json({ error: 'Directory not found' }, { status: 404 });
+    // Add retry logic for file deletion
+    const maxRetries = 3;
+    const retryDelay = 20000; // 10 seconds between attempts
+
+    // Initial delay to ensure file handles are released
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Initial delay to ensure file handles are released
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await fs.access(filePath);
+        await fs.rm(filePath, { recursive: true, force: true });
+        return NextResponse.json({ message: 'Directory deleted successfully' }, { status: 200 });
+      } catch (error) {
+        if (error.code === 'ENOENT') {
+          return NextResponse.json({ error: 'Directory not found' }, { status: 404 });
+        }
+        
+        console.error(`Directory deletion attempt ${attempt} failed:`, error);
+        
+        if (attempt === maxRetries) {
+          return NextResponse.json({ 
+            error: 'Failed to delete directory after multiple attempts',
+            details: error.message
+          }, { status: 500 });
+        }
+        
+        // Increase delay for each retry
+        await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
       }
-      console.error('Directory deletion error:', error);
-      return NextResponse.json({ error: 'Failed to delete directory' }, { status: 500 });
     }
 
   } catch (error) {
