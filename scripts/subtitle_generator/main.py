@@ -136,51 +136,69 @@ class VideoTranscriber:
             print(f"Erreur transcription: {str(e)}")
 
 
-    def extract_frames(self, output_folder):
-        print("Application des sous-titres...")
+    def extract_frames(self, output_folder, session_id):
+
+        print("Applying subtitles...")
         try:
             cap = cv2.VideoCapture(self.video_path)
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             
-            for frame_count in tqdm(range(int(cap.get(cv2.CAP_PROP_FRAME_COUNT))), desc="Traitement"):
-                ret, frame = cap.read()
-                if not ret:
-                    break
+            with tqdm(total=total_frames, desc="Processing frames") as pbar:
+                for frame_count in range(total_frames):
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
 
-                # Recherche du mot actuel
-                current_word = next((w for w in self.word_timings 
-                                   if w["start"] <= frame_count <= w["end"]), None)
+                    # Recherche du mot actuel
 
-                if current_word:
-                    text = current_word["text"]
-                    
-                    # Convertir l'image OpenCV en image PIL
-                    image_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                    draw = ImageDraw.Draw(image_pil)
-                    font = ImageFont.truetype(FONT_PATH, FONT_SIZE)
-                    
-                    # Position centrale garantie
-                    text_bbox = draw.textbbox((0, 0), text, font=font)
-                    text_width = text_bbox[2] - text_bbox[0]
-                    text_height = text_bbox[3] - text_bbox[1]
-                    x = (width - text_width) // 2
-                    y = (height + text_height) // 2 + 50  # Décalage vers le bas
-                    
-                    # Dessiner le texte avec contour
-                    for dx in range(-OUTLINE_THICKNESS, OUTLINE_THICKNESS + 1):
-                        for dy in range(-OUTLINE_THICKNESS, OUTLINE_THICKNESS + 1):
-                            if dx != 0 or dy != 0:
-                                draw.text((x + dx, y + dy), text, font=font, fill=OUTLINE_COLOR)
-                    draw.text((x, y), text, font=font, fill=TEXT_COLOR)
-                    
-                    # Convertir l'image PIL en image OpenCV
-                    frame = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
+                    current_word = next((w for w in self.word_timings 
+                                       if w["start"] <= frame_count <= w["end"]), None)
 
-                cv2.imwrite(os.path.join(output_folder, f"{frame_count}.jpg"), frame)
+                    if current_word:
+                        text = current_word["text"]
+                        
+                        # Convertir l'image OpenCV en image PIL
+                        image_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                        draw = ImageDraw.Draw(image_pil)
+                        font = ImageFont.truetype(FONT_PATH, FONT_SIZE)
+                        
+                        # Position centrale garantie
+                        text_bbox = draw.textbbox((0, 0), text, font=font)
+                        text_width = text_bbox[2] - text_bbox[0]
+                        text_height = text_bbox[3] - text_bbox[1]
+                        x = (width - text_width) // 2
+                        y = (height + text_height) // 2 + 50  # Décalage vers le bas
+                        
+                        # Dessiner le texte avec contour
+                        for dx in range(-OUTLINE_THICKNESS, OUTLINE_THICKNESS + 1):
+                            for dy in range(-OUTLINE_THICKNESS, OUTLINE_THICKNESS + 1):
+                                if dx != 0 or dy != 0:
+                                    draw.text((x + dx, y + dy), text, font=font, fill=OUTLINE_COLOR)
+                        draw.text((x, y), text, font=font, fill=TEXT_COLOR)
+                        
+                        # Convertir l'image PIL en image OpenCV
+                        frame = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
+
+                    cv2.imwrite(os.path.join(output_folder, f"{frame_count}.jpg"), frame)
+
+                    if frame_count % 10 == 0:  # Update progress every 10 frames
+                        progress = 70 + int(25 * (frame_count / total_frames))
+                        session_id = os.environ.get('SESSION_ID', 'default_session')
+                        print(f"{session_id}|PROGRESS:{progress}%|Processing frame {frame_count}/{total_frames}")
+
+                        sys.stdout.flush()
+                    pbar.update(1)
+
+
 
             cap.release()
-            print("Sous-titres appliqués!")
+            session_id = os.environ.get('SESSION_ID', 'default_session')
+            print(f"{session_id}|PROGRESS:95%|Finalizing video")
+
+            sys.stdout.flush()
+
 
         except Exception as e:
             print(f"Erreur traitement: {str(e)}")
@@ -189,10 +207,14 @@ class VideoTranscriber:
         print('Creating video')
         try:
             image_folder = os.path.join(os.path.dirname(self.video_path), "frames")
-            if not os.path.exists(image_folder):
-                os.makedirs(image_folder)
+            # Ensure frames directory exists
+            os.makedirs(image_folder, exist_ok=True)
             
-            self.extract_frames(image_folder)
+            self.extract_frames(image_folder, session_id)
+
+
+
+
             
             images = [img for img in os.listdir(image_folder) if img.endswith(".jpg")]
             images.sort(key=lambda x: int(x.split(".")[0]))
@@ -202,8 +224,31 @@ class VideoTranscriber:
             audio = AudioFileClip(self.audio_path)
             clip = clip.set_audio(audio)
             clip.write_videofile(output_video_path)
-            shutil.rmtree(image_folder)
-            os.remove(os.path.join(os.path.dirname(self.video_path), "audio.mp3"))
+            # Clean up frames directory
+            for filename in os.listdir(image_folder):
+                file_path = os.path.join(image_folder, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    print(f'Failed to delete {file_path}. Reason: {e}')
+            
+            # Remove empty frames directory
+            try:
+                os.rmdir(image_folder)
+            except Exception as e:
+                print(f'Failed to remove directory {image_folder}. Reason: {e}')
+
+
+            
+            # Remove audio file
+            try:
+                os.remove(os.path.join(os.path.dirname(self.video_path), "audio.mp3"))
+            except Exception as e:
+                print(f'Failed to remove audio file. Reason: {e}')
+
         except Exception as e:
             print(f"Error creating video: {e}")
             
@@ -226,24 +271,64 @@ def normalize_text(text):
     text = re.sub(r'[^a-zA-Z0-9\s]', '', text)
     return text.upper()
 
-def put_subtitles(video_path, transcription_text=None):
-    model_path = "base"
-    output_video_path = "tmp/final_video.mp4"
-    transcriber = VideoTranscriber(model_path, video_path, transcription_text)
-    transcriber.extract_audio()
-    transcriber.transcribe_video()
-    transcriber.create_video(output_video_path)
-    return print('Subtitles added!')
+def put_subtitles(video_path, transcription_text=None, session_id=None):
+
+    try:
+        print("\n=== Starting Subtitle Processing ===")
+        print(f"Input video: {video_path}")
+        
+        model_path = "base"
+        output_video_path = f"public/tmp/{session_id}/video_with_subtitles.mp4"  # Ensure output path uses session ID
+        
+        session_id = os.environ.get('SESSION_ID', 'default_session')
+        print(f"{session_id}|PROGRESS:10%|Initializing transcriber")
+        sys.stdout.flush()
+
+        sys.stdout.flush()
+        transcriber = VideoTranscriber(model_path, video_path, transcription_text)
+        
+        print(f"{session_id}|PROGRESS:25%|Extracting audio")
+        sys.stdout.flush()
+        transcriber.extract_audio()
+        
+        print(f"{session_id}|PROGRESS:40%|Transcribing video")
+        sys.stdout.flush()
+        transcriber.transcribe_video()
+        
+        print(f"{session_id}|PROGRESS:60%|Creating subtitled video")
+
+
+        sys.stdout.flush()
+        transcriber.create_video(output_video_path)
+
+        
+        print('\n=== Subtitles added successfully! ===')
+        print(f"Output video: {output_video_path}")
+
+        return output_video_path
+    except Exception as e:
+        print("\n!!! Error processing subtitles !!!")
+        print(f"Error details: {str(e)}")
+        print("Stack trace:")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+
 
 #put_subtitles('E:/Users/danie/Bureau/Perso/Projets/subtitles_webapp/subtitle-generator/tmp/video_without_subtitles.mp4', None)
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4 or sys.argv[1] != 'put_subtitles':
-        print("Usage: python main.py put_subtitles <video_path> <transcription_text>")
+    if len(sys.argv) < 4 or sys.argv[1] != 'put_subtitles':
+        print("Usage: python main.py put_subtitles <video_path> [transcription_text] <session_id>")
         sys.exit(1)
 
     video_path = sys.argv[2]
-    if sys.argv[3]:
-        transcription_text = sys.argv[3]
-
-    put_subtitles(video_path, transcription_text)
+    transcription_text = sys.argv[3] if len(sys.argv) > 4 else None
+    session_id = sys.argv[4] if len(sys.argv) > 4 else sys.argv[3]
+    
+    # Set session ID as environment variable
+    os.environ['SESSION_ID'] = session_id
+    
+    put_subtitles(video_path, transcription_text, session_id)

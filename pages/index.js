@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react';
-import Header from '../../components/Header';
+import Header from '../components/Header';
+
 const videoSrc = '/vid.mp4';
 
 // Default dark theme colors
@@ -15,13 +16,12 @@ const darkTheme = {
 
 export default function Home() {
   const [file, setFile] = useState(null);
+  const [sessionId, setSessionId] = useState(Date.now().toString(36) + Math.random().toString(36).substring(2));
   const [fileName, setFileName] = useState(''); // State for file n
-  const [progress, setProgress] = useState(0); // State for progress
   const [isUploading, setIsUploading] = useState(false); // State to track upload status
-  const [isDownloadReady, setIsDownloadReady] = useState(false); // State to   track download readiness
-  const [isProcessing, setIsProcessing] = useState(false); // State to track processing status
-
-
+  const [processingStatus, setProcessingStatus] = useState('idle'); // 'idle' | 'processing' | 'ready' | 'error'
+  const [processedVideoPath, setProcessedVideoPath] = useState(''); // Path to processed video
+  const [errorMessage, setErrorMessage] = useState(''); // Store processing errors
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -33,16 +33,55 @@ export default function Home() {
     try {
       const data = new FormData();
       data.set('file', file);
+      data.set('sessionId', sessionId); // Include session ID in the form data
       setIsUploading(true); // Set uploading state to true
-      setIsProcessing(true); // Set processing state to true
+      setProcessingStatus('processing'); // Set processing state
+      const processedPath = "public/tmp/"+sessionId+"/video_with_subtitles.mp4" 
+      console.log("processed video path = ", processedPath) // Use processedPath instead
+      setProcessedVideoPath(processedPath)
+
       const res = await fetch('/api/upload', {
+        headers: {
+          'X-Session-Id': sessionId, // Include session ID in the request headers
+        },
         method: 'POST',
-        body: data,
-        onUploadProgress: (event) => {
-          const percent = Math.round((event.loaded * 100) / event.total);
-          setProgress(percent); // Update progress
-        }
+        body: data
       });
+
+      console.log(sessionId)
+
+      // Start polling for processing status
+      const interval = setInterval(async () => {
+        try {
+          const statusRes = await fetch(`/api/processing-status?sessionId=${sessionId}`);
+          if (statusRes.ok) {
+            const { status } = await statusRes.json();
+            setProcessingStatus(status);
+            
+            if (status === 'ready') {
+              clearInterval(interval);
+              setProcessedVideoPath(`/api/download?sessionId=${sessionId}`);
+            }
+            
+            if (status === 'error') {
+              clearInterval(interval);
+              setErrorMessage('Video processing failed - please try again');
+            }
+          }
+        } catch (error) {
+          console.error('Error checking processing status:', error);
+          clearInterval(interval);
+          setProcessingStatus('error');
+          setErrorMessage('Failed to check processing status');
+        }
+      }, 2000);
+
+      // Wait for processing to complete
+      const { outputPath } = await res.json(); // Ensure the output path is correctly retrieved
+
+      clearInterval(interval);
+      setProcessedVideoPath(outputPath);
+
       if (!res.ok) {
         throw new Error(await res.text());
       }
@@ -79,9 +118,7 @@ export default function Home() {
       rights: "© 2023 Dynamic Subtitles SaaS. All rights reserved.",
       dragAndDropMessage: "Drag and drop your video file here",
       downloadButton: "Download video"
-
     },
-
     es: {
       uploadTitle: "Sube tu video",
       uploadDescription: "Sube tu archivo de video para generar subtítulos dinámicos.",
@@ -100,7 +137,6 @@ export default function Home() {
       dragAndDropMessage: "Arrastra y suelta tu archivo de video aquí",
       downloadButton: "Descargar video"
     },
-
     fr: {
       uploadTitle: "Téléversez votre vidéo",
       uploadDescription: "Téléversez votre fichier vidéo pour générer des sous-titres dynamiques.",
@@ -119,7 +155,6 @@ export default function Home() {
       dragAndDropMessage: "Glissez-déposez votre fichier vidéo ici",
       downloadButton: "Télécharger la vidéo"
     },
-
     pt: {
       uploadTitle: "Carregar seu vídeo",
       uploadDescription: "Carregue seu arquivo de vídeo para gerar legendas dinâmicas.",
@@ -138,7 +173,6 @@ export default function Home() {
       dragAndDropMessage: "Arraste e solte seu arquivo de vídeo aqui",
       downloadButton: "Baixar vídeo"
     }
-
   };
 
   const selectedLanguage = translations[language];
@@ -187,9 +221,9 @@ export default function Home() {
                     type="button" 
                     className={`${darkTheme.button} text-white bg-blue-600 hover:bg-blue-700 mt-2 px-4 py-2 md:px-6 md:py-3 rounded-full w-full`} 
                     id="chooseButton" 
-                    onClick={() => !isProcessing && document.getElementById('videoInput').click()} 
+                    onClick={() => processingStatus === 'idle' && document.getElementById('videoInput').click()} 
                     style={{ display: !file ? 'block' : 'none' }} 
-                    disabled={isProcessing}
+                    disabled={processingStatus !== 'idle'}
                   >
                     {selectedLanguage.selectVideoLabel}
                   </button>
@@ -210,16 +244,16 @@ export default function Home() {
                         alert('Please select a valid video file.'); 
                       } 
                     }} 
-                    disabled={isProcessing}
+                    disabled={processingStatus !== 'idle'}
                   />
 
                   <button 
                     type="button" 
-                    className={`${darkTheme.button} ${isUploading || isProcessing ? 'bg-gray-400' : 'text-white bg-blue-600 hover:bg-blue-700'} mt-2 px-4 py-2 md:px-6 md:py-3 rounded-full w-full`} 
+                    className={`${darkTheme.button} ${isUploading || processingStatus !== 'idle' ? 'bg-gray-400' : 'text-white bg-blue-600 hover:bg-blue-700'} mt-2 px-4 py-2 md:px-6 md:py-3 rounded-full w-full`} 
                     id="uploadButton" 
                     onClick={onSubmit} 
                     style={{ display: file ? 'block' : 'none' }} 
-                    disabled={isUploading || isProcessing}
+                    disabled={processingStatus !== 'idle' || isUploading || !file}
                   >
                     {isUploading ? (
                       <>
@@ -229,28 +263,33 @@ export default function Home() {
                       selectedLanguage.uploadButton
                     )}
                   </button>
-                </div>
 
-                <div className="w-full bg-gray-300 rounded-full mt-4">
-                  <div className="bg-blue-600 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded-full" style={{ width: `${progress}%` }}>{progress}%</div>
+                  <button 
+                    type="button" 
+                    className={`${darkTheme.button} text-white px-4 py-2 md:px-6 md:py-3 rounded-full w-full mt-auto`} 
+                    id="downloadButton" 
+                    onClick={async () => {
+                      const videoPath = `tmp/${sessionId}/video_with_subtitles.mp4`;
+                      
+                      // Trigger the download
+                      const response = await fetch(videoPath);
+                      if (!response.ok) {
+                        console.error('Failed to fetch video:', response.statusText);
+                        return;
+                      }
+
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.style.display = 'none';
+                      a.href = url;
+                      a.download = 'video_with_subtitles.mp4';
+                      a.click();
+                    }}
+                  >
+                    {selectedLanguage.downloadButton}
+                  </button>
                 </div>
-                <button 
-                  type="button" 
-                  className={`${darkTheme.button} text-white px-4 py-2 md:px-6 md:py-3 rounded-full w-full mt-auto`} 
-                  id="downloadButton" 
-                  disabled={!isDownloadReady} // Disable button until process is complete
-                  onClick={() => {
-                    // Logic to download the video
-                    const link = document.createElement('a');
-                    link.href = '/path/to/your/video.mp4'; // Update with the correct path to the processed video
-                    link.download = 'video_with_subtitles.mp4';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                  }}
-                >
-                  {selectedLanguage.downloadButton}
-                </button>
               </form>
             </div>
             <div className="text-center mb-20">
