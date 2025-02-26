@@ -269,22 +269,54 @@ export default function Home() {
                     className={`${darkTheme.button} text-white px-4 py-2 md:px-6 md:py-3 rounded-full w-full mt-auto`} 
                     id="downloadButton" 
                     onClick={async () => {
-                      const videoPath = `tmp/${sessionId}/video_with_subtitles.mp4`;
-                      
-                      // Trigger the download
-                      const response = await fetch(videoPath);
-                      if (!response.ok) {
-                        console.error('Failed to fetch video:', response.statusText);
-                        return;
-                      }
+                      try {
+                        const videoPath = `tmp/${sessionId}/video_with_subtitles.mp4`;
+                        
+                        // Trigger the download
+                        const response = await fetch(videoPath);
+                        if (!response.ok) {
+                          console.error('Failed to fetch video:', response.statusText);
+                          return;
+                        }
 
-                      const blob = await response.blob();
-                      const url = window.URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.style.display = 'none';
-                      a.href = url;
-                      a.download = 'video_with_subtitles.mp4';
-                      a.click();
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = 'video_with_subtitles.mp4';
+                        
+                        // Start the download and wait for it to begin
+                        await new Promise((resolve) => {
+                          a.addEventListener('click', resolve, { once: true });
+                          a.click();
+                        });
+                        
+                        // Clean up the URL
+                        window.URL.revokeObjectURL(url);
+                        
+                        // Call cleanup endpoint
+                        const cleanupResponse = await fetch('/api/upload/cleanup', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({ sessionId }),
+                        });
+                        
+                        if (!cleanupResponse.ok) {
+                          console.error('Failed to cleanup files:', cleanupResponse.statusText);
+                        }
+                        
+                        // Reset states after successful download and cleanup
+                        setProcessingStatus('idle');
+                        setFile(null);
+                        setFileName('');
+                        setProcessedVideoPath('');
+                        
+                      } catch (error) {
+                        console.error('Error during download and cleanup:', error);
+                      }
                     }}
                   >
                     {selectedLanguage.downloadButton}

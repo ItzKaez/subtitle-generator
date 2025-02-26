@@ -20,14 +20,14 @@ export async function POST(req) {
 
     try {
       await fs.access(filePath);
-      await fs.unlink(filePath);
-      return NextResponse.json({ message: 'File deleted successfully' }, { status: 200 });
+      await fs.rm(filePath, { recursive: true, force: true });
+      return NextResponse.json({ message: 'Directory deleted successfully' }, { status: 200 });
     } catch (error) {
       if (error.code === 'ENOENT') {
-        return NextResponse.json({ error: 'File not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Directory not found' }, { status: 404 });
       }
-      console.error('File deletion error:', error);
-      return NextResponse.json({ error: 'Failed to delete file' }, { status: 500 });
+      console.error('Directory deletion error:', error);
+      return NextResponse.json({ error: 'Failed to delete directory' }, { status: 500 });
     }
 
   } catch (error) {
