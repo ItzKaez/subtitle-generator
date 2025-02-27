@@ -5,13 +5,13 @@ import Header from '../components/Header';
 const videoSrc = '/vid.mp4';
 
 // Default dark theme colors
-const theme = {
-  background: 'bg-[#1E1E2E]',
-  text: 'text-[#FAF3E0]',
-  card: 'bg-[#252538]',
+const darkTheme = {
+  background: 'bg-gray-900',
+  text: 'text-gray-100',
+  card: 'bg-gray-800',
   input: 'bg-gray-700 text-white',
-  button: 'bg-[#FF6B6B]',
-  footer: 'bg-[#252538]'
+  button: 'bg-blue-600',
+  footer: 'bg-gray-800'
 };
 
 export default function Home() {
@@ -129,7 +129,7 @@ export default function Home() {
       selectSubtitleColorLabel: "Seleccionar color de subtítulos",
       selectSubtitleSizeLabel: "Seleccionar tamaño de subtítulos",
       uploadButton: "Subir video",
-      livePreviewTitle: "Vista previa de subtítulos",
+      livePreviewTitle: "Vista previa of subtítulos",
       home: "Inicio",
       features: "Características",
       pricing: "Precios",
@@ -179,25 +179,25 @@ export default function Home() {
   const selectedLanguage = translations[language];
 
   return (
-    <div className={`${theme.background} ${theme.text} min-h-screen overflow-x-hidden`}>
+    <div className={`${darkTheme.background} ${darkTheme.text} min-h-screen overflow-x-hidden`}>
       <Header changeLanguage={changeLanguage} selectedLanguage={selectedLanguage} />
-      <main className={`container mx-auto p-4 ${theme.text}`}>
+      <main className={`container mx-auto p-4 ${darkTheme.text}`}>
         <section className="text-center my-8">
-          <h1 className="text-5xl font-extrabold mb-6 text-[#FF6B6B]" id="uploadTitle">
+          <h1 className="text-4xl text-red-400 font-bold mb-4" id="uploadTitle">
             {selectedLanguage.uploadTitle}
           </h1>
-          <p className="text-xl mb-10 text-[#FAF3E0]" id="uploadDescription">
+          <p className="text-lg mb-8" id="uploadDescription">
             {selectedLanguage.uploadDescription}
           </p>
-          <div className="flex flex-col gap-15 w-full max-w-2xl mx-auto">
-            <div className={`${theme.card} h-[510px] p-6 rounded-2xl shadow-lg w-full`}>
+          <div className="flex flex-col md:flex-row gap-8 w-full max-w-4xl mx-auto">
+            <div className={`${darkTheme.card} h-[50vh] p-2 md:p-4 rounded-lg shadow-md w-full md:w-1/2`}>
               <form onSubmit={onSubmit}>
                 <div className="mb-4">
                   <label className="block text-left text-gray-300 font-bold mb-2" id="selectVideoLabel">
                     {selectedLanguage.selectVideoLabel}
                   </label>
                   <div 
-                    className={`w-full h-62 border-dashed border-2 border-gray-400 flex items-center justify-center ${theme.input}`} 
+                    className={`w-full h-32 border-dashed border-2 border-gray-400 flex items-center justify-center ${darkTheme.input}`} 
                     style={{ cursor: isAddingSubtitles ? 'not-allowed' : 'pointer' }} 
                     onClick={() => !isAddingSubtitles && document.getElementById('videoInput').click()} 
                     onDrop={(e) => {
@@ -213,14 +213,14 @@ export default function Home() {
                     }} 
                     onDragOver={(e) => e.preventDefault()}
                   >
-                    <p className="text-[#FAF3E0]">
+                    <p className="text-gray-500">
                       {isAddingSubtitles ? 'Processing...' : file ? fileName : selectedLanguage.dragAndDropMessage}
                     </p>
                   </div>
 
                   <button 
                     type="button" 
-                    className={`${theme.button} text-white hover:bg-[#f74040] mt-30 px-6 py-3 rounded-xl w-full font-semibold text-lg shadow-md hover:shadow-lg transition-all cursor-pointer duration-200`} 
+                    className={`${darkTheme.button} text-white bg-blue-600 hover:bg-blue-700 mt-2 px-4 py-2 md:px-6 md:py-3 rounded-full w-full`} 
                     id="chooseButton" 
                     onClick={() => processingStatus === 'idle' && document.getElementById('videoInput').click()} 
                     style={{ display: (!file && !isUploading && !isAddingSubtitles && processingStatus === 'idle') || isDownloadComplete ? 'block' : 'none' }}
@@ -229,7 +229,7 @@ export default function Home() {
                     {selectedLanguage.selectVideoLabel}
                   </button>
                   <input 
-                    className={`w-full h-32 border-dashed border-2 border-gray-400 flex items-center justify-center ${theme.input}`} 
+                    className={`w-full h-32 border-dashed border-2 border-gray-400 flex items-center justify-center ${darkTheme.input}`} 
                     id="videoInput" 
                     name="video" 
                     type="file" 
@@ -251,7 +251,7 @@ export default function Home() {
                   <div className="space-y-4">
                     <button 
                       type="button" 
-                      className={`${theme.button} ${isUploading || processingStatus !== 'idle' ? 'bg-gray-400' : 'text-white cursor-pointer hover:bg-[#f74040]'} mt-30 px-6 py-3 rounded-xl w-full font-semibold text-lg shadow-md hover:shadow-lg transition-all`} 
+                      className={`${darkTheme.button} ${isUploading || processingStatus !== 'idle' ? 'bg-gray-400' : 'text-white bg-blue-600 hover:bg-blue-700'} mt-2 px-4 py-2 md:px-6 md:py-3 rounded-full w-full`} 
                       id="uploadButton" 
                       onClick={onSubmit} 
                       style={{ display: file && !isAddingSubtitles && processingStatus !== 'ready' ? 'block' : 'none' }} 
@@ -269,7 +269,7 @@ export default function Home() {
 
                     {isAddingSubtitles && (
                       <div className="flex flex-col items-center justify-center mt-4">
-                        <img src="/spinning.gif" alt="Loading" className="w-16 h-16 mt-10 animate-spin duration-1000 ease-linear" />
+                        <img src="/spinning.gif" alt="Loading" className="w-16 h-16 animate-spin duration-1000 ease-linear" />
                         <p className="text-gray-300 mt-2">
                           {fileDetectedTime ? 'Finalizing video...' : 'Adding subtitles...'}
                         </p>
@@ -279,7 +279,7 @@ export default function Home() {
 
                   <button 
                     type="button" 
-                    className={`${theme.button} text-white mt-30 px-6 py-3 rounded-xl w-full font-semibold text-lg hover:bg-[#f74040] shadow-md hover:shadow-lg transition-all cursor-pointer`} 
+                    className={`${darkTheme.button} text-white px-4 py-2 md:px-6 md:py-3 rounded-full w-full mt-auto`} 
                     id="downloadButton" 
                     style={{ display: processingStatus === 'ready' ? 'block' : 'none' }}
                     onClick={async () => {
@@ -337,14 +337,14 @@ export default function Home() {
                 </div>
               </form>
             </div>
-            <div className="text-center mb-10">
-              <h2 className="text-3xl font-bold mb-6" id="livePreviewTitle">
+            <div className="text-center mb-20">
+              <h2 className="text-3xl font-bold mb-4" id="livePreviewTitle">
                 {selectedLanguage.livePreviewTitle}
               </h2>
-              <div className=" md:mb-20">
+              <div className="mb-8 md:mb-20">
                 <div className="flex justify-center w-full">
                   <video 
-                    className="w-full md:w-2/3 lg:w-1/2 max-w-md h-auto max-h-[70vh] md:max-h-none" 
+                    className="w-full md:w-2/3 lg:w-1/2 max-w-md h-auto max-h-[50vh] md:max-h-none" 
                     loop 
                     autoPlay 
                     muted 
@@ -360,7 +360,7 @@ export default function Home() {
           </div>
         </section>
       </main>
-      <footer className={`${theme.footer} text-[#FAF3E0] text-center p-4`}>
+      <footer className={`${darkTheme.footer} text-white text-center p-4`}>
         <p>{selectedLanguage.rights}</p>
       </footer>
     </div>
