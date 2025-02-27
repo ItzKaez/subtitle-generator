@@ -183,7 +183,7 @@ export default function Home() {
       <Header changeLanguage={changeLanguage} selectedLanguage={selectedLanguage} />
       <main className={`container mx-auto p-4 ${darkTheme.text}`}>
         <section className="text-center my-8">
-          <h1 className="text-4xl font-bold mb-4" id="uploadTitle">
+          <h1 className="text-4xl text-red-400 font-bold mb-4" id="uploadTitle">
             {selectedLanguage.uploadTitle}
           </h1>
           <p className="text-lg mb-8" id="uploadDescription">
