@@ -7,12 +7,12 @@ const videoSrc = "/vid.mp4";
 
 // Modern theme with gradients and glass effects
 const theme = {
-  background: "bg-gradient-to-br via-gray-800 ",
+  background: "bg-gradient-to-br to-[#1C1E2A] from-[#1C1E2A] via-[#1C1E2A]  ",
   text: "text-gray-100",
   card: "bg-gray-800/90 backdrop-blur-sm",
   input: "bg-gray-900/80 text-gray-100",
-  button: "bg-gradient-to-r from-indigo-600 to-purple-600",
-  buttonHover: "hover:from-indigo-700 hover:to-purple-700",
+  button: "bg-gradient-to-r from--[#FF7B7B] to-[#FF5F5F] ",
+  buttonHover: "hover:from-[#FF7B7B] hover:to-[#FF5F5F] cursor-pointer ",
 };
 
 export default function page() {
@@ -207,7 +207,7 @@ export default function page() {
         <div className="absolute inset-0 via-transparent to-transparent pointer-events-none" />
         
         <section className="text-center my-8 relative">
-          <h1 className="text-6xl font-extrabold mb-6 bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent" id="uploadTitle">
+          <h1 className="text-6xl font-extrabold mb-6 bg-gradient-to-r from-[#FF7B7B] to-[#FF5F5F] bg-clip-text text-transparent" id="uploadTitle">
             {selectedLanguage.uploadTitle}
           </h1>
           <p className="text-xl mb-10 text-gray-300" id="uploadDescription">
@@ -240,7 +240,7 @@ export default function page() {
                   <div
                     className={`
                       w-full h-48 border-3 border-dashed 
-                      ${isAddingSubtitles ? 'border-purple-500/30' : 'border-gray-600 hover:border-purple-500/50'} 
+                      ${isAddingSubtitles ? 'border-[#FF5F5F]' : 'border-gray-600 hover:border-[#FF7B7B]'} 
                       rounded-2xl transition-all duration-300 ease-in-out
                       flex flex-col items-center justify-center
                       ${theme.input} cursor-pointer
@@ -262,7 +262,7 @@ export default function page() {
                   >
                     {/* Upload Icon */}
                     <svg 
-                      className={`w-12 h-12 mb-4 ${isAddingSubtitles ? 'text-purple-500' : 'text-gray-500 group-hover:text-purple-400'} transition-colors duration-300`}
+                      className={`w-12 h-12 mb-4 ${isAddingSubtitles ? 'text-[#FF7B7B]' : 'text-gray-500 group-hover:text-[#FF7B7B]'} transition-colors duration-300`}
                       fill="none" 
                       stroke="currentColor" 
                       viewBox="0 0 24 24"
@@ -275,7 +275,7 @@ export default function page() {
                       />
                     </svg>
                     
-                    <p className={`text-lg ${isAddingSubtitles ? 'text-purple-400' : 'text-gray-400 group-hover:text-gray-300'} transition-colors duration-300`}>
+                    <p className={`text-lg ${isAddingSubtitles ? 'text-[#FF7B7B]' : 'text-gray-400 group-hover:text-gray-300'} transition-colors duration-300`}>
                       {isAddingSubtitles ? "Processing..." : file ? fileName : selectedLanguage.dragAndDropMessage}
                     </p>
                   </div>
@@ -288,7 +288,7 @@ export default function page() {
                         {selectedLanguage.selectSubtitleFontLabel}
                       </label>
                       <select
-                        className={`${theme.input} w-full rounded-lg px-3 py-2 border border-gray-700 focus:border-purple-500 transition-colors duration-300`}
+                        className={`${theme.input} w-full rounded-lg px-3 py-2 border border-gray-700 focus:border-[#FF5F5F] transition-colors duration-300`}
                         value={subtitleFont}
                         onChange={(e) => setSubtitleFont(e.target.value)}
                       >
@@ -304,7 +304,7 @@ export default function page() {
                         {selectedLanguage.selectSubtitleColorLabel}
                       </label>
                       <select
-                        className={`${theme.input} w-full rounded-lg px-3 py-2 border border-gray-700 focus:border-purple-500 transition-colors duration-300`}
+                        className={`${theme.input} w-full rounded-lg px-3 py-2 border border-gray-700 focus:border-[#FF5F5F] transition-colors duration-300`}
                         value={subtitleColor}
                         onChange={(e) => setSubtitleColor(e.target.value)}
                       >
@@ -320,7 +320,7 @@ export default function page() {
                         {selectedLanguage.selectSubtitleSizeLabel}
                       </label>
                       <select
-                        className={`${theme.input} w-full rounded-lg px-3 py-2 border border-gray-700 focus:border-purple-500 transition-colors duration-300`}
+                        className={`${theme.input} w-full rounded-lg px-3 py-2 border border-gray-700 focus:border-[#FF5F5F] transition-colors duration-300`}
                         value={subtitleSize}
                         onChange={(e) => setSubtitleSize(e.target.value)}
                       >
@@ -360,22 +360,18 @@ export default function page() {
                         className={`
                           ${theme.button} ${theme.buttonHover}
                           w-full py-4 rounded-xl font-semibold text-lg
-                          shadow-lg shadow-purple-500/20
+                          shadow-lg shadow-[#FF5F5F]/20
                           transform transition-all duration-300
-                          hover:shadow-purple-500/30 hover:scale-[1.02]
+                          hover:shadow-[#FF5F5F]/30 hover:scale-[1.02]
                           disabled:opacity-50 disabled:cursor-not-allowed
-                          flex items-center justify-center gap-3
+                          flex items-center justify-center gap-3 bg-[#FF5F5F] 
                         `}
                         disabled={processingStatus !== "idle" || isUploading}
                       >
                         {isUploading ? (
                           <>
-                            <img
-                              src="/spinning.gif"
-                              alt="Loading"
-                              className="w-6 h-6 animate-spin"
-                            />
-                            <span>Uploading...</span>
+                            <svg aria-hidden="true" class="w-8 h-8 text-gray-200 animate-spin dark:text-gray-600 fill-[#FF5F5F] " viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/><path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/></svg>
+                            <span class="sr-only">Uploading...</span>
                           </>
                         ) : (
                           selectedLanguage.uploadButton
@@ -387,14 +383,10 @@ export default function page() {
                     {isAddingSubtitles && (
                       <div className="flex flex-col items-center justify-center py-6">
                         <div className="relative">
-                          <img
-                            src="/spinning.gif"
-                            alt="Processing"
-                            className="w-16 h-16 animate-spin"
-                          />
+                          <svg aria-hidden="true" class="w-8 h-8 text-gray-200 animate-spin dark:text-gray-600 fill-[#FF5F5F] " viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/><path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/></svg>
                           <div className="absolute inset-0 bg-gradient-to-t from-gray-800/50 via-transparent to-transparent rounded-full" />
                         </div>
-                        <p className="text-purple-300 mt-4 text-lg">
+                        <p className="text-[#FF7B7B] mt-4 text-lg">
                           {fileDetectedTime ? "Finalizing video..." : "Adding subtitles..."}
                         </p>
                       </div>
@@ -441,10 +433,10 @@ export default function page() {
                         className={`
                           ${theme.button} ${theme.buttonHover}
                           w-full py-4 rounded-xl font-semibold text-lg
-                          shadow-lg shadow-purple-500/20
+                          shadow-lg shadow-[#FF5F5F]/20
                           transform transition-all duration-300
-                          hover:shadow-purple-500/30 hover:scale-[1.02]
-                          flex items-center justify-center gap-2
+                          hover:shadow-[#FF5F5F]/30 hover:scale-[1.02]
+                          flex items-center justify-center gap-2 bg-[#FF5F5F]
                         `}
                       >
                         <svg 
