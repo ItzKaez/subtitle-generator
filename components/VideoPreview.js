@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState } from 'react';
 
-const VideoPreview = ({ src, onLoad, onError }) => {
+const VideoPreview = ({ src, onLoad, onError, subtitleOptions = {}, subtitleText = "Preview Subtitle Text", isUploading = false, hideSubtitleOverlay = false }) => {
   const videoRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -30,7 +30,9 @@ const VideoPreview = ({ src, onLoad, onError }) => {
   };
 
   const handleTimeUpdate = () => {
-    setCurrentTime(videoRef.current.currentTime);
+    if (!isUploading) {
+      setCurrentTime(videoRef.current.currentTime);
+    }
   };
 
   const togglePlay = () => {
@@ -58,6 +60,34 @@ const VideoPreview = ({ src, onLoad, onError }) => {
     }
   };
 
+  // Map subtitle size to Tailwind text sizes
+  const getTextSizeClass = (size) => {
+    const sizeMap = {
+      'small': 'text-lg',
+      'medium': 'text-xl',
+      'large': 'text-2xl',
+      'x-large': 'text-3xl'
+    };
+    return sizeMap[size] || 'text-xl';
+  };
+
+  // Map subtitle color to Tailwind text colors
+  const getTextColorClass = (color) => {
+    const colorMap = {
+      'white': 'text-white',
+      'yellow': 'text-yellow-400',
+      'green': 'text-green-400',
+      'cyan': 'text-cyan-400',
+      'pink': 'text-pink-400'
+    };
+    return colorMap[color] || 'text-white';
+  };
+
+  // Get font class
+  const getFontClass = (font) => {
+    return `font-${font.toLowerCase().replace(/\s+/g, '-')}`;
+  };
+
   return (
     <div className="w-full space-y-4">
       {/* Video Container */}
@@ -81,12 +111,35 @@ const VideoPreview = ({ src, onLoad, onError }) => {
           onLoadedData={handleLoadedData}
           onError={handleError}
           onTimeUpdate={handleTimeUpdate}
-          onClick={togglePlay}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            togglePlay();
+          }}
         />
+
+        {/* Subtitle Overlay */}
+        {!isLoading && !error && !hideSubtitleOverlay && (
+          <div className="absolute bottom-20 left-0 right-0 flex justify-center pointer-events-none">
+            <div className={`
+              px-4 py-2 rounded-lg bg-black/40 backdrop-blur-sm
+              ${getTextSizeClass(subtitleOptions.size)}
+              ${getTextColorClass(subtitleOptions.color)}
+              ${getFontClass(subtitleOptions.font)}
+              text-center max-w-[80%] transition-all duration-200
+            `}>
+              {subtitleText}
+            </div>
+          </div>
+        )}
 
         {/* Play/Pause Button Overlay */}
         <button
-          onClick={togglePlay}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            togglePlay();
+          }}
           className={`
             absolute inset-0 flex items-center justify-center
             bg-black/0 hover:bg-black/30 transition-colors duration-200

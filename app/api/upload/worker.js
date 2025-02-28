@@ -36,6 +36,46 @@ async function verifyRequiredFiles(projectRoot) {
   return errors;
 }
 
+// Ensure cleanup of temporary files
+async function ensureCleanup(sessionId) {
+  try {
+    // Wait a bit to ensure all file handles are released
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const tmpDir = path.join(process.cwd(), 'public', 'tmp', sessionId);
+    const framesDir = path.join(tmpDir, 'frames');
+    const audioFile = path.join(tmpDir, 'audio.mp3');
+    
+    // Remove frames directory if it exists
+    try {
+      await fs.rm(framesDir, { recursive: true, force: true });
+    } catch (e) {
+      console.warn(`Warning: Could not remove frames directory: ${e.message}`);
+    }
+    
+    // Remove temporary audio file if it exists
+    try {
+      await fs.unlink(audioFile);
+    } catch (e) {
+      console.warn(`Warning: Could not remove audio file: ${e.message}`);
+    }
+    
+    // Remove any other temporary files
+    const tmpFiles = await fs.readdir(tmpDir);
+    for (const file of tmpFiles) {
+      if (file.includes('TEMP') || file.endsWith('.tmp')) {
+        try {
+          await fs.unlink(path.join(tmpDir, file));
+        } catch (e) {
+          console.warn(`Warning: Could not remove temporary file ${file}: ${e.message}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Error during cleanup for session ${sessionId}:`, error);
+  }
+}
+
 export async function processUpload(file, sessionId, subtitleOptions) {
   let filePath; // Declare filePath in the outer scope
   try {
@@ -138,27 +178,28 @@ async function processSubtitles(videoPath, sessionId, options) {
       const fontSize = fontSizeMap[options.size] || 80;  // default to medium (80) if invalid
       const textColor = colorMap[options.color] || '255,255,255';  // default to white if invalid
       
+      // Ensure paths are properly escaped for Windows
+      const escapePath = (p) => p.replace(/\\/g, '\\\\');
+      
       const commandArgs = [
         'python',
         '-u',  // Add unbuffered mode flag
-        `"${scriptPath}"`,
+        escapePath(scriptPath),
         '--model_path', 'base',
-        '--video_path', `"${videoPath}"`,
-        '--output_path', `"${outputPath}"`,
-        '--session_id', `"${sessionId}"`,
-        '--font_path', `"${fontPath}"`,
-        '--font_size', `${fontSize}`,
-        '--text_color', `"${textColor}"`
+        '--video_path', escapePath(videoPath),
+        '--output_path', escapePath(outputPath),
+        '--session_id', sessionId,
+        '--font_path', escapePath(fontPath),
+        '--font_size', fontSize.toString(),  // Convert number to string
+        '--text_color', textColor
       ];
 
-      // Join arguments with proper spacing and quoting
-      const command = commandArgs.join(' ');
-
-      console.log('Executing command:', command);
+      console.log('Executing command:', commandArgs);
       ProgressTracker.updateProgress(sessionId, 25, 'Starting subtitle generation');
 
       // Execute the Python script with proper environment
-      const subprocess = exec(command, {
+      const subprocess = exec(commandArgs.join(' '), {
+        maxBuffer: 1024 * 1024 * 10, // Increase buffer size to 10MB
         env: {
           ...process.env,
           PYTHONIOENCODING: 'utf-8',
@@ -312,7 +353,7 @@ async function processSubtitles(videoPath, sessionId, options) {
       });
 
       // Handle process completion
-      subprocess.on('close', (code) => {
+      subprocess.on('close', async (code) => {
         // Clear all intervals
         if (transcriptionInterval) {
           clearInterval(transcriptionInterval);
@@ -328,6 +369,7 @@ async function processSubtitles(videoPath, sessionId, options) {
           if (currentProgress && currentProgress.progress >= 95) {
             ProgressTracker.updateProgress(sessionId, 100, 'Process completed successfully');
           }
+          await ensureCleanup(sessionId);
           resolve();
         } else {
           // Extract error message from Python output if available
@@ -336,6 +378,7 @@ async function processSubtitles(videoPath, sessionId, options) {
             ? errorMatch[1] 
             : `Process exited with code ${code}`;
 
+          await ensureCleanup(sessionId);
           const error = new Error(errorMessage);
           ProgressTracker.updateProgress(sessionId, 100, `Error: ${errorMessage}`);
           reject(error);
@@ -343,7 +386,7 @@ async function processSubtitles(videoPath, sessionId, options) {
       });
 
       // Handle process errors
-      subprocess.on('error', (error) => {
+      subprocess.on('error', async (error) => {
         // Clear all intervals
         if (transcriptionInterval) {
           clearInterval(transcriptionInterval);
@@ -354,12 +397,14 @@ async function processSubtitles(videoPath, sessionId, options) {
         }
 
         console.error('Process error:', error);
+        await ensureCleanup(sessionId);
         ProgressTracker.updateProgress(sessionId, 100, `Error: ${error.message}`);
         reject(error);
       });
 
     } catch (error) {
       console.error('Error in processSubtitles:', error);
+      await ensureCleanup(sessionId);
       ProgressTracker.updateProgress(sessionId, 100, `Error: ${error.message}`);
       reject(error);
     }
@@ -371,6 +416,7 @@ async function processSubtitles(videoPath, sessionId, options) {
  */
 export async function cleanupSession(sessionId) {
   try {
+    await ensureCleanup(sessionId);
     await FileHandler.cleanup(sessionId);
     ProgressTracker.progressMap.delete(sessionId);
   } catch (error) {

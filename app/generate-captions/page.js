@@ -18,6 +18,7 @@ export default function GenerateCaptions() {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [processedVideoUrl, setProcessedVideoUrl] = useState('');
+  const [previewUrl, setPreviewUrl] = useState('');
   const [subtitleOptions, setSubtitleOptions] = useState({
     font: 'Arial',
     color: 'white',
@@ -28,6 +29,15 @@ export default function GenerateCaptions() {
   useEffect(() => {
     setSessionId(Date.now().toString(36) + Math.random().toString(36).substring(2));
   }, []);
+
+  // Cleanup preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   // Poll for progress updates
   useEffect(() => {
@@ -69,9 +79,18 @@ export default function GenerateCaptions() {
   // Handle file selection
   const handleFileSelect = (selectedFile) => {
     if (selectedFile && selectedFile.type.startsWith('video/')) {
+      // Revoke previous preview URL if it exists
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      
       setFile(selectedFile);
       setFileName(selectedFile.name);
       setError('');
+      
+      // Create new preview URL
+      const newPreviewUrl = URL.createObjectURL(selectedFile);
+      setPreviewUrl(newPreviewUrl);
     } else {
       setError('Please select a valid video file');
     }
@@ -164,7 +183,37 @@ export default function GenerateCaptions() {
             </div>
           )}
 
-          {/* Upload Form */}
+          {/* Preview Section */}
+          {(previewUrl || processedVideoUrl) && (
+            <div className="mt-8">
+              <h2 className="text-2xl font-bold mb-4">Preview</h2>
+              {previewUrl && !processedVideoUrl && !isUploading && (
+                <VideoPreview
+                  src={previewUrl}
+                  subtitleOptions={subtitleOptions}
+                  onError={() => setError('Failed to load video preview')}
+                  isUploading={isUploading}
+                />
+              )}
+              {processedVideoUrl && (
+                <VideoPreview
+                  src={processedVideoUrl}
+                  subtitleOptions={subtitleOptions}
+                  onError={() => setError('Failed to load video preview')}
+                  isUploading={isUploading}
+                  hideSubtitleOverlay={true}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Subtitle Options */}
+          <SubtitleOptions
+            options={subtitleOptions}
+            onChange={setSubtitleOptions}
+            disabled={isUploading}
+          />
+
           <form onSubmit={handleUpload} className="space-y-6">
             {/* File Upload Area */}
             <div
@@ -213,13 +262,6 @@ export default function GenerateCaptions() {
                 disabled={isUploading}
               />
             </div>
-
-            {/* Subtitle Options */}
-            <SubtitleOptions
-              options={subtitleOptions}
-              onChange={setSubtitleOptions}
-              disabled={isUploading}
-            />
 
             {/* Progress Bar */}
             {isUploading && (
@@ -279,17 +321,6 @@ export default function GenerateCaptions() {
               )}
             </div>
           </form>
-
-          {/* Video Preview */}
-          {processedVideoUrl && (
-            <div className="mt-8">
-              <h2 className="text-2xl font-bold mb-4">Preview</h2>
-              <VideoPreview
-                src={processedVideoUrl}
-                onError={() => setError('Failed to load video preview')}
-              />
-            </div>
-          )}
         </div>
       </main>
 
