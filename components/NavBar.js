@@ -31,19 +31,19 @@ export default function NavBar({ changeLanguage, selectedLanguage }) {
       <div className="flex items-center gap-6">
         <div className="flex gap-8 mr-8">
           <Link
-            href="#features"
+            href="/features"
             className="hover:text-[#FF7B7B] transition-colors"
           >
             Features
           </Link>
           <Link
-            href="#pricing"
+            href="/pricing"
             className="hover:text-[#FF7B7B] transition-colors"
           >
             Pricing
           </Link>
           <Link
-            href="#about"
+            href="/about"
             className="hover:text-[#FF7B7B] transition-colors"
           >
             About
