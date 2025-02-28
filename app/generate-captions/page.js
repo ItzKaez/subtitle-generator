@@ -7,7 +7,7 @@ const videoSrc = "/vid.mp4";
 
 // Modern theme with gradients and glass effects
 const theme = {
-  background: "bg-gradient-to-br bg-purple-800 via-gray-800 to-bg-[#22253A]",
+  background: "bg-gradient-to-br via-gray-800 ",
   text: "text-gray-100",
   card: "bg-gray-800/90 backdrop-blur-sm",
   input: "bg-gray-900/80 text-gray-100",
