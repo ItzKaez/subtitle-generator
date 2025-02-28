@@ -37,6 +37,7 @@ async function verifyRequiredFiles(projectRoot) {
 }
 
 export async function processUpload(file, sessionId, subtitleOptions) {
+  let filePath; // Declare filePath in the outer scope
   try {
     // Initialize progress tracking with more granular stages
     ProgressTracker.updateProgress(sessionId, 0, 'Initializing');
@@ -63,7 +64,7 @@ export async function processUpload(file, sessionId, subtitleOptions) {
     }, 100);
 
     try {
-      const filePath = await FileHandler.saveFile(file, sessionId);
+      filePath = await FileHandler.saveFile(file, sessionId); // Assign to the outer scope variable
       clearInterval(uploadInterval);
       ProgressTracker.updateProgress(sessionId, 20, 'File saved successfully');
     } catch (error) {
@@ -239,6 +240,10 @@ async function processSubtitles(videoPath, sessionId, options) {
       const estimatedTranscriptionTime = 15000; // Estimate 15 seconds for transcription
       let transcriptionInterval;
 
+      let finalVideoInterval = null;
+      const estimatedFinalProcessingTime = 30000; // Estimate 30 seconds for final processing
+      let finalProcessingStartTime = 0;
+
       // Handle process stderr output (includes both errors and info messages)
       subprocess.stderr?.on('data', (data) => {
         const output = data.toString();
@@ -275,18 +280,46 @@ async function processSubtitles(videoPath, sessionId, options) {
           ProgressTracker.updateProgress(sessionId, 55, 'Transcription completed');
         }
         else if (output.includes('Creating final video')) {
+          finalProcessingStartTime = Date.now();
           ProgressTracker.updateProgress(sessionId, 60, 'Creating final video');
+          
+          // Start final video processing progress updates
+          if (!finalVideoInterval) {
+            finalVideoInterval = setInterval(() => {
+              const elapsedTime = Date.now() - finalProcessingStartTime;
+              const finalProgress = Math.min(100, (elapsedTime / estimatedFinalProcessingTime) * 100);
+              // Scale final processing progress from 60% to 90%
+              const scaledProgress = Math.round(60 + (finalProgress * 0.3));
+              console.log(`Final processing progress: ${Math.round(finalProgress)}%, Scaled: ${scaledProgress}%`);
+              
+              if (scaledProgress < 90) { // Cap at 90% until we get success confirmation
+                ProgressTracker.updateProgress(
+                  sessionId,
+                  scaledProgress,
+                  'Creating final video'
+                );
+              }
+            }, 1000);
+          }
         }
         else if (output.includes('Video created successfully')) {
+          if (finalVideoInterval) {
+            clearInterval(finalVideoInterval);
+            finalVideoInterval = null;
+          }
           ProgressTracker.updateProgress(sessionId, 98, 'Video creation completed');
         }
       });
 
       // Handle process completion
       subprocess.on('close', (code) => {
-        // Always clear the transcription interval if it exists
+        // Clear all intervals
         if (transcriptionInterval) {
           clearInterval(transcriptionInterval);
+        }
+        if (finalVideoInterval) {
+          clearInterval(finalVideoInterval);
+          finalVideoInterval = null;
         }
 
         if (code === 0) {
@@ -311,9 +344,13 @@ async function processSubtitles(videoPath, sessionId, options) {
 
       // Handle process errors
       subprocess.on('error', (error) => {
-        // Clear the transcription interval if it exists
+        // Clear all intervals
         if (transcriptionInterval) {
           clearInterval(transcriptionInterval);
+        }
+        if (finalVideoInterval) {
+          clearInterval(finalVideoInterval);
+          finalVideoInterval = null;
         }
 
         console.error('Process error:', error);
