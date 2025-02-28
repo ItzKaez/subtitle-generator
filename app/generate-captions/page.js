@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
@@ -254,7 +254,6 @@ export default function GenerateCaptions() {
             {/* Preview Section */}
             {(previewUrl || processedVideoUrl) && (
               <div className="mt-8">
-                <h2 className="text-2xl font-bold mb-4">Preview</h2>
                 {previewUrl && !processedVideoUrl && !isUploading && (
                   <VideoPreview
                     src={previewUrl}
@@ -272,15 +271,17 @@ export default function GenerateCaptions() {
                     hideSubtitleOverlay={true}
                   />
                 )}
+                {previewUrl && !processedVideoUrl && !isUploading && (
+                  <div className="mt-4 p-4 bg-gray-900 rounded-lg shadow-md">
+                    <SubtitleOptions
+                      options={subtitleOptions} // Ensure this is passed correctly
+                      onChange={setSubtitleOptions} // Ensure onChange is correctly set
+                      disabled={isUploading} // Pass the disabled state if needed
+                    />
+                  </div>
+                )}
               </div>
             )}
-
-            {/* Subtitle Options */}
-            <SubtitleOptions
-              options={subtitleOptions}
-              onChange={setSubtitleOptions}
-              disabled={isUploading}
-            />
 
             {/* Action Buttons */}
             <div className="flex justify-center gap-4">

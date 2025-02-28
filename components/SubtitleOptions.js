@@ -1,6 +1,6 @@
 'use client';
 
-const SubtitleOptions = ({ options, onChange, disabled }) => {
+const SubtitleOptions = ({ options = {}, onChange, disabled }) => {
   const {
     font = 'Arial',
     color = 'white',

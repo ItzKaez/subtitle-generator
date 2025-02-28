@@ -1,10 +1,20 @@
-'use client';
+"use client";
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState } from "react";
 
-const VideoPreview = ({ src, onLoad, onError, subtitleOptions = {}, subtitleText = "Preview Subtitle Text", isUploading = false, hideSubtitleOverlay = false }) => {
+const VideoPreview = ({
+  src,
+  onLoad,
+  onError,
+  subtitleOptions = {},
+  subtitleText = "Preview Subtitle Text",
+  isUploading = false,
+  hideSubtitleOverlay = false,
+}) => {
   const videoRef = useRef(null);
-  const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
+    const titleRef = useRef(null);
+
   const [error, setError] = useState(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -21,11 +31,14 @@ const VideoPreview = ({ src, onLoad, onError, subtitleOptions = {}, subtitleText
     setIsLoading(false);
     setDuration(videoRef.current.duration);
     if (onLoad) onLoad();
+    titleRef.current.scrollIntoView({ behavior: 'smooth' });
+
+
   };
 
   const handleError = (e) => {
     setIsLoading(false);
-    setError('Failed to load video');
+    setError("Failed to load video");
     if (onError) onError(e);
   };
 
@@ -49,7 +62,7 @@ const VideoPreview = ({ src, onLoad, onError, subtitleOptions = {}, subtitleText
   const formatTime = (time) => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
   const handleSeek = (e) => {
@@ -63,33 +76,36 @@ const VideoPreview = ({ src, onLoad, onError, subtitleOptions = {}, subtitleText
   // Map subtitle size to Tailwind text sizes
   const getTextSizeClass = (size) => {
     const sizeMap = {
-      'small': 'text-lg',
-      'medium': 'text-xl',
-      'large': 'text-2xl',
-      'x-large': 'text-3xl'
+      small: "text-lg",
+      medium: "text-xl",
+      large: "text-2xl",
+      "x-large": "text-3xl",
     };
-    return sizeMap[size] || 'text-xl';
+    return sizeMap[size] || "text-xl";
   };
 
   // Map subtitle color to Tailwind text colors
   const getTextColorClass = (color) => {
     const colorMap = {
-      'white': 'text-white',
-      'yellow': 'text-yellow-400',
-      'green': 'text-green-400',
-      'cyan': 'text-cyan-400',
-      'pink': 'text-pink-400'
+      white: "text-white",
+      yellow: "text-yellow-400",
+      green: "text-green-400",
+      cyan: "text-cyan-400",
+      pink: "text-pink-400",
     };
-    return colorMap[color] || 'text-white';
+    return colorMap[color] || "text-white";
   };
 
   // Get font class
   const getFontClass = (font) => {
-    return `font-${font.toLowerCase().replace(/\s+/g, '-')}`;
+    return `font-${font.toLowerCase().replace(/\s+/g, "-")}`;
   };
 
   return (
     <div className="w-full space-y-4">
+      <h2 ref={titleRef} className="text-2xl font-bold mb-4">Preview</h2>
+
+
       {/* Video Container */}
       <div className="relative w-full aspect-video bg-gray-900 rounded-lg overflow-hidden">
         {isLoading && (
@@ -97,7 +113,7 @@ const VideoPreview = ({ src, onLoad, onError, subtitleOptions = {}, subtitleText
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#FF7B7B] border-t-transparent"></div>
           </div>
         )}
-        
+
         {error && (
           <div className="absolute inset-0 flex items-center justify-center text-red-400">
             {error}
@@ -121,13 +137,15 @@ const VideoPreview = ({ src, onLoad, onError, subtitleOptions = {}, subtitleText
         {/* Subtitle Overlay */}
         {!isLoading && !error && !hideSubtitleOverlay && (
           <div className="absolute bottom-20 left-0 right-0 flex justify-center pointer-events-none">
-            <div className={`
+            <div
+              className={`
               px-4 py-2 rounded-lg bg-black/40 backdrop-blur-sm
               ${getTextSizeClass(subtitleOptions.size)}
               ${getTextColorClass(subtitleOptions.color)}
               ${getFontClass(subtitleOptions.font)}
               text-center max-w-[80%] transition-all duration-200
-            `}>
+            `}
+            >
               {subtitleText}
             </div>
           </div>
@@ -143,23 +161,25 @@ const VideoPreview = ({ src, onLoad, onError, subtitleOptions = {}, subtitleText
           className={`
             absolute inset-0 flex items-center justify-center
             bg-black/0 hover:bg-black/30 transition-colors duration-200
-            ${isLoading ? 'hidden' : ''}
+            ${isLoading ? "hidden" : ""}
           `}
         >
-          <div className={`
+          <div
+            className={`
             w-16 h-16 rounded-full bg-black/50 flex items-center justify-center
             transform transition-transform duration-200
-            ${isPlaying ? 'scale-0' : 'scale-100'}
-          `}>
-            <svg 
-              className="w-8 h-8 text-white" 
-              fill="currentColor" 
+            ${isPlaying ? "scale-0" : "scale-100"}
+          `}
+          >
+            <svg
+              className="w-8 h-8 text-white"
+              fill="currentColor"
               viewBox="0 0 24 24"
             >
               {isPlaying ? (
-                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
               ) : (
-                <path d="M8 5v14l11-7z"/>
+                <path d="M8 5v14l11-7z" />
               )}
             </svg>
           </div>
