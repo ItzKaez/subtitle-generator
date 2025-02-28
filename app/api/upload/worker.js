@@ -38,22 +38,44 @@ async function verifyRequiredFiles(projectRoot) {
 
 export async function processUpload(file, sessionId, subtitleOptions) {
   try {
-    // Initialize progress tracking
-    ProgressTracker.updateProgress(sessionId, 0, 'Starting upload');
+    // Initialize progress tracking with more granular stages
+    ProgressTracker.updateProgress(sessionId, 0, 'Initializing');
 
     // Verify required files
     const projectRoot = getProjectRoot();
+    ProgressTracker.updateProgress(sessionId, 5, 'Verifying setup');
     const verificationErrors = await verifyRequiredFiles(projectRoot);
     
     if (verificationErrors.length > 0) {
       throw new Error(`Setup verification failed:\n${verificationErrors.join('\n')}`);
     }
 
-    // Save file
-    const filePath = await FileHandler.saveFile(file, sessionId);
-    ProgressTracker.updateProgress(sessionId, 20, 'File saved');
+    // Update progress during file upload
+    ProgressTracker.updateProgress(sessionId, 10, 'Starting file upload');
+    
+    // Save file with progress updates
+    let uploadProgress = 10;
+    const uploadInterval = setInterval(() => {
+      if (uploadProgress < 20) {
+        uploadProgress += 1;
+        ProgressTracker.updateProgress(sessionId, uploadProgress, 'Uploading file...');
+      }
+    }, 100);
 
-    // Process subtitles
+    try {
+      const filePath = await FileHandler.saveFile(file, sessionId);
+      clearInterval(uploadInterval);
+      ProgressTracker.updateProgress(sessionId, 20, 'File saved successfully');
+    } catch (error) {
+      clearInterval(uploadInterval);
+      throw error;
+    }
+
+    // Small delay to show "File saved successfully" message
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Process subtitles with more detailed initial status
+    ProgressTracker.updateProgress(sessionId, 25, 'Preparing video processing');
     await processSubtitles(filePath, sessionId, {
       ...subtitleOptions,
       font: 'Chantilly' // Always use Chantilly font
@@ -117,6 +139,7 @@ async function processSubtitles(videoPath, sessionId, options) {
       
       const commandArgs = [
         'python',
+        '-u',  // Add unbuffered mode flag
         `"${scriptPath}"`,
         '--model_path', 'base',
         '--video_path', `"${videoPath}"`,
@@ -150,31 +173,128 @@ async function processSubtitles(videoPath, sessionId, options) {
         const output = data.toString();
         console.log('Process output:', output);
 
-        // Parse progress information
-        if (output.includes('Progress:')) {
-          const match = output.match(/Progress: (\d+)%/);
-          if (match) {
-            const progress = parseInt(match[1]);
+        // Parse MoviePy progress for audio extraction
+        if (output.includes('MoviePy - Writing audio')) {
+          const chunkMatch = output.match(/chunk:\s+(\d+)%/);
+          if (chunkMatch) {
+            const rawProgress = parseInt(chunkMatch[1], 10);
+            // Scale audio extraction progress from 25% to 35%
+            const scaledProgress = Math.round(25 + (rawProgress * 0.1));
+            console.log(`Audio extraction: ${rawProgress}%, Scaled: ${scaledProgress}%`);
             ProgressTracker.updateProgress(
               sessionId,
-              25 + (progress * 0.7), // Scale progress between 25% and 95%
-              'Processing video and generating subtitles'
+              scaledProgress,
+              'Extracting audio from video'
+            );
+          }
+        }
+
+        // Parse frame processing progress (main processing phase)
+        const frameProgressMatch = output.match(/Processing frames:\s+(\d+)%/);
+        if (frameProgressMatch) {
+          const rawProgress = parseInt(frameProgressMatch[1], 10);
+          // Scale frame processing from 35% to 75%
+          const scaledProgress = Math.round(35 + (rawProgress * 0.4));
+          console.log(`Frame processing: ${rawProgress}%, Scaled: ${scaledProgress}%`);
+          ProgressTracker.updateProgress(
+            sessionId,
+            scaledProgress,
+            'Processing video frames'
+          );
+        }
+
+        // Parse final video building progress
+        const finalProgressMatch = output.match(/t:\s+(\d+)%/);
+        if (finalProgressMatch) {
+          const rawProgress = parseInt(finalProgressMatch[1], 10);
+          // Scale final building from 75% to 95%
+          const scaledProgress = Math.round(75 + (rawProgress * 0.2));
+          console.log(`Final building: ${rawProgress}%, Scaled: ${scaledProgress}%`);
+          ProgressTracker.updateProgress(
+            sessionId,
+            scaledProgress,
+            'Building final video'
+          );
+        }
+
+        // Parse chunk processing for final audio
+        if (output.includes('MoviePy - Writing video')) {
+          const chunkMatch = output.match(/chunk:\s+(\d+)%/);
+          if (chunkMatch) {
+            const rawProgress = parseInt(chunkMatch[1], 10);
+            // Scale final audio processing from 95% to 98%
+            const scaledProgress = Math.round(95 + (rawProgress * 0.03));
+            console.log(`Final audio: ${rawProgress}%, Scaled: ${scaledProgress}%`);
+            ProgressTracker.updateProgress(
+              sessionId,
+              scaledProgress,
+              'Finalizing video audio'
             );
           }
         }
       });
 
-      // Handle process errors
+      // Track transcription progress
+      let transcriptionStartTime = 0;
+      const estimatedTranscriptionTime = 15000; // Estimate 15 seconds for transcription
+      let transcriptionInterval;
+
+      // Handle process stderr output (includes both errors and info messages)
       subprocess.stderr?.on('data', (data) => {
-        const error = data.toString();
-        console.error('Process error output:', error);
-        errorOutput += error;
+        const output = data.toString();
+        console.error('Process error output:', output);
+        errorOutput += output;
+
+        // Parse progress indicators from stderr with more granular updates
+        if (output.includes('Audio extraction completed successfully')) {
+          ProgressTracker.updateProgress(sessionId, 35, 'Audio extraction completed');
+        } 
+        else if (output.includes('Starting video transcription')) {
+          transcriptionStartTime = Date.now();
+          ProgressTracker.updateProgress(sessionId, 35, 'Starting transcription');
+          
+          // Start transcription progress updates
+          transcriptionInterval = setInterval(() => {
+            const elapsedTime = Date.now() - transcriptionStartTime;
+            const transcriptionProgress = Math.min(100, (elapsedTime / estimatedTranscriptionTime) * 100);
+            // Scale transcription progress from 35% to 55%
+            const scaledProgress = Math.round(35 + (transcriptionProgress * 0.2));
+            console.log(`Transcription progress: ${Math.round(transcriptionProgress)}%, Scaled: ${scaledProgress}%`);
+            ProgressTracker.updateProgress(
+              sessionId,
+              scaledProgress,
+              'Transcribing audio'
+            );
+          }, 500);
+        }
+        else if (output.includes('Transcription completed')) {
+          if (transcriptionInterval) {
+            clearInterval(transcriptionInterval);
+          }
+          transcriptionStartTime = 0;
+          ProgressTracker.updateProgress(sessionId, 55, 'Transcription completed');
+        }
+        else if (output.includes('Creating final video')) {
+          ProgressTracker.updateProgress(sessionId, 60, 'Creating final video');
+        }
+        else if (output.includes('Video created successfully')) {
+          ProgressTracker.updateProgress(sessionId, 98, 'Video creation completed');
+        }
       });
 
       // Handle process completion
       subprocess.on('close', (code) => {
+        // Always clear the transcription interval if it exists
+        if (transcriptionInterval) {
+          clearInterval(transcriptionInterval);
+        }
+
         if (code === 0) {
-          ProgressTracker.updateProgress(sessionId, 95, 'Finalizing video');
+          // Only update to 100% if we successfully reached the video creation stage (95%)
+          const currentProgress = ProgressTracker.getProgress(sessionId);
+          if (currentProgress && currentProgress.progress >= 95) {
+            ProgressTracker.updateProgress(sessionId, 100, 'Process completed successfully');
+          }
           resolve();
         } else {
           // Extract error message from Python output if available
@@ -191,6 +311,11 @@ async function processSubtitles(videoPath, sessionId, options) {
 
       // Handle process errors
       subprocess.on('error', (error) => {
+        // Clear the transcription interval if it exists
+        if (transcriptionInterval) {
+          clearInterval(transcriptionInterval);
+        }
+
         console.error('Process error:', error);
         ProgressTracker.updateProgress(sessionId, 100, `Error: ${error.message}`);
         reject(error);
