@@ -165,7 +165,7 @@ export default function Home() {
       cta: {
         title: "Pronto para Começar?",
         subtitle: "Junte-se a milhares de criadores de conteúdo que confiam no Dynamic Captions para suas necessidades de legendas.",
-        button: "Experimente Agora - É Grátis"
+        button: "Experimente Agora - É Gratis"
       }
     }
   };
@@ -181,24 +181,26 @@ export default function Home() {
       <NavBar changeLanguage={changeLanguage} selectedLanguage={selectedLanguage} />
       
       {/* Hero Section */}
-      <main className="max-w-6xl mx-auto px-8 py-20">
-        <div className="text-center mb-20">
-          <h2 className="text-6xl font-bold mb-6 bg-gradient-to-r from-[#FF7B7B] to-[#FF5F5F] inline-block text-transparent bg-clip-text">
-            {selectedLanguage.hero.title}
-          </h2>
-          <p className="text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center py-20 lg:py-32">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-8">
+            <span className="bg-gradient-to-r from-[#FF7B7B] to-[#FF5F5F] inline-block text-transparent bg-clip-text animate-gradient">
+              {selectedLanguage.hero.title}
+            </span>
+          </h1>
+          <p className="text-lg sm:text-xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed">
             {selectedLanguage.hero.subtitle}
           </p>
-          <div className="flex gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               href="/generate-captions"
-              className="bg-[#FF7B7B] hover:bg-[#FF6B6B] px-8 py-4 rounded-xl font-medium transition-colors"
+              className="bg-[#FF7B7B] hover:bg-[#FF6B6B] px-8 py-4 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
             >
               {selectedLanguage.hero.tryNow}
             </Link>
             <Link
               href="#features"
-              className="border border-gray-600 hover:border-gray-400 px-8 py-4 rounded-xl font-medium transition-colors"
+              className="border border-gray-600 hover:border-gray-400 px-8 py-4 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 hover:bg-gray-800/50"
             >
               {selectedLanguage.hero.learnMore}
             </Link>
@@ -206,14 +208,19 @@ export default function Home() {
         </div>
 
         {/* Features Section */}
-        <section id="features" className="py-20">
-          <h3 className="text-3xl font-bold text-center mb-16">
-            {selectedLanguage.features.title}
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <section id="features" className="py-20 lg:py-32">
+          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-16">
+            <span className="bg-gradient-to-r from-[#FF7B7B] to-[#FF5F5F] inline-block text-transparent bg-clip-text">
+              {selectedLanguage.features.title}
+            </span>
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 px-4">
             {selectedLanguage.features.items.map((feature, index) => (
-              <div key={index} className="bg-[#22253A] p-8 rounded-2xl">
-                <div className="w-12 h-12 bg-[#FF7B7B]/20 rounded-lg flex items-center justify-center mb-4">
+              <div 
+                key={index} 
+                className="bg-[#22253A] p-8 rounded-2xl shadow-lg transition-all duration-300 hover:transform hover:scale-105 hover:shadow-xl"
+              >
+                <div className="w-12 h-12 bg-[#FF7B7B]/20 rounded-lg flex items-center justify-center mb-6">
                   {index === 0 && (
                     <svg className="w-6 h-6 text-[#FF7B7B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -230,47 +237,48 @@ export default function Home() {
                     </svg>
                   )}
                 </div>
-                <h3 className="text-xl font-medium mb-2">{feature.title}</h3>
-                <p className="text-gray-400">{feature.description}</p>
+                <h3 className="text-xl font-semibold mb-4">{feature.title}</h3>
+                <p className="text-gray-400 leading-relaxed">{feature.description}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* Stats Section */}
-        <section className="py-20 border-t border-gray-800">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <h4 className="text-4xl font-bold text-[#FF7B7B] mb-2">{selectedLanguage.stats.languages}</h4>
-              <p className="text-gray-400">{selectedLanguage.stats.languagesLabel}</p>
-            </div>
-            <div>
-              <h4 className="text-4xl font-bold text-[#FF7B7B] mb-2">{selectedLanguage.stats.accuracy}</h4>
-              <p className="text-gray-400">{selectedLanguage.stats.accuracyLabel}</p>
-            </div>
-            <div>
-              <h4 className="text-4xl font-bold text-[#FF7B7B] mb-2">{selectedLanguage.stats.videos}</h4>
-              <p className="text-gray-400">{selectedLanguage.stats.videosLabel}</p>
-            </div>
-            <div>
-              <h4 className="text-4xl font-bold text-[#FF7B7B] mb-2">{selectedLanguage.stats.support}</h4>
-              <p className="text-gray-400">{selectedLanguage.stats.supportLabel}</p>
-            </div>
+        <section className="py-20 lg:py-32 border-t border-gray-800">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 lg:gap-16">
+            {Object.entries(selectedLanguage.stats).reduce((acc, [key, value], index) => {
+              if (!key.includes('Label')) {
+                acc.push(
+                  <div key={key} className="text-center transform transition-all duration-300 hover:scale-105">
+                    <h4 className="text-3xl sm:text-4xl font-bold text-[#FF7B7B] mb-2">{value}</h4>
+                    <p className="text-gray-400">{selectedLanguage.stats[key + 'Label']}</p>
+                  </div>
+                );
+              }
+              return acc;
+            }, [])}
           </div>
         </section>
 
         {/* CTA Section */}
-        <section className="py-20 text-center">
-          <h3 className="text-4xl font-bold mb-6">{selectedLanguage.cta.title}</h3>
-          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            {selectedLanguage.cta.subtitle}
-          </p>
-          <Link
-            href="/generate-captions"
-            className="inline-block bg-[#FF7B7B] hover:bg-[#FF6B6B] px-8 py-4 rounded-xl font-medium transition-colors"
-          >
-            {selectedLanguage.cta.button}
-          </Link>
+        <section className="py-20 lg:py-32 text-center">
+          <div className="bg-[#22253A] rounded-3xl p-12 shadow-2xl transform transition-all duration-300 hover:shadow-[#FF7B7B]/10">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-6">
+              <span className="bg-gradient-to-r from-[#FF7B7B] to-[#FF5F5F] inline-block text-transparent bg-clip-text">
+                {selectedLanguage.cta.title}
+              </span>
+            </h2>
+            <p className="text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
+              {selectedLanguage.cta.subtitle}
+            </p>
+            <Link
+              href="/generate-captions"
+              className="inline-block bg-[#FF7B7B] hover:bg-[#FF6B6B] px-8 py-4 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+            >
+              {selectedLanguage.cta.button}
+            </Link>
+          </div>
         </section>
       </main>
 

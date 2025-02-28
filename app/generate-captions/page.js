@@ -1,17 +1,18 @@
 "use client";
 import { useState, useEffect } from "react";
-import NavBar from "@/components/NavBar";
-import Footer from "@/components/Footer";
+import NavBar from "../../components/NavBar";
+import Footer from "../../components/Footer";
 
 const videoSrc = "/vid.mp4";
 
-// Default dark theme colors
+// Modern theme with gradients and glass effects
 const theme = {
-  background: "bg-[#1C1E2A]",
-  text: "text-[#FAF3E0]",
-  card: "bg-[#22253A]",
-  input: "bg-gray-700 text-white",
-  button: "bg-[#FF6B6B]",
+  background: "bg-gradient-to-br bg-purple-800 via-gray-800 to-bg-[#22253A]",
+  text: "text-gray-100",
+  card: "bg-gray-800/90 backdrop-blur-sm",
+  input: "bg-gray-900/80 text-gray-100",
+  button: "bg-gradient-to-r from-indigo-600 to-purple-600",
+  buttonHover: "hover:from-indigo-700 hover:to-purple-700",
 };
 
 export default function page() {
@@ -28,6 +29,9 @@ export default function page() {
   const [checkInterval, setCheckInterval] = useState(null);
   const [isDownloadComplete, setIsDownloadComplete] = useState(false);
   const [fileDetectedTime, setFileDetectedTime] = useState(null);
+  const [subtitleFont, setSubtitleFont] = useState("Arial");
+  const [subtitleColor, setSubtitleColor] = useState("white");
+  const [subtitleSize, setSubtitleSize] = useState("medium");
 
   useEffect(() => {
     return () => {
@@ -40,7 +44,7 @@ export default function page() {
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!file) {
-      console.error("No file selected");
+      setErrorMessage("Please select a video file first");
       return;
     }
 
@@ -48,10 +52,15 @@ export default function page() {
       const data = new FormData();
       data.set("file", file);
       data.set("sessionId", sessionId);
+      data.set("subtitleFont", subtitleFont);
+      data.set("subtitleColor", subtitleColor);
+      data.set("subtitleSize", subtitleSize);
+      
       setIsUploading(true);
       setProcessingStatus("processing");
-      const processedPath =
-        "public/tmp/" + sessionId + "/video_with_subtitles.mp4";
+      setErrorMessage("");
+      
+      const processedPath = "public/tmp/" + sessionId + "/video_with_subtitles.mp4";
       setProcessedVideoPath(processedPath);
 
       const res = await fetch("/api/upload", {
@@ -95,10 +104,12 @@ export default function page() {
         clearInterval(checkFileInterval);
       };
 
-      setFile(null);
-      setFileName("");
     } catch (e) {
       console.error(e);
+      setErrorMessage(e.message || "An error occurred while processing your video");
+      setIsUploading(false);
+      setIsAddingSubtitles(false);
+      setProcessingStatus("idle");
     }
   };
 
@@ -111,8 +122,7 @@ export default function page() {
   const translations = {
     en: {
       uploadTitle: "Upload Your Video",
-      uploadDescription:
-        "Upload your video file to generate dynamic subtitles.",
+      uploadDescription: "Upload your video file to generate dynamic subtitles.",
       selectVideoLabel: "Select Video File",
       selectSubtitleLanguageLabel: "Select Subtitle Language",
       selectSubtitleFontLabel: "Select Subtitle Font",
@@ -190,266 +200,278 @@ export default function page() {
   const selectedLanguage = translations[language];
 
   return (
-    <div
-      className={`${theme.background} ${theme.text} min-h-screen overflow-x-hidden`}
-    >
-      <NavBar
-        changeLanguage={changeLanguage}
-        selectedLanguage={selectedLanguage}
-      />
-      <main className={`container mx-auto p-4 ${theme.text}`}>
-        <section className="text-center my-8">
-          <h1
-            className="text-5xl font-extrabold mb-6 text-[#FF6B6B]"
-            id="uploadTitle"
-          >
+    <div className={`${theme.background} ${theme.text} min-h-screen overflow-x-hidden`}>
+      <NavBar changeLanguage={changeLanguage} selectedLanguage={selectedLanguage} />
+      
+      <main className="container mx-auto p-4 relative">
+        <div className="absolute inset-0 via-transparent to-transparent pointer-events-none" />
+        
+        <section className="text-center my-8 relative">
+          <h1 className="text-6xl font-extrabold mb-6 bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent" id="uploadTitle">
             {selectedLanguage.uploadTitle}
           </h1>
-          <p className="text-xl mb-10 text-[#FAF3E0]" id="uploadDescription">
+          <p className="text-xl mb-10 text-gray-300" id="uploadDescription">
             {selectedLanguage.uploadDescription}
           </p>
-          <div className="flex flex-col gap-15 w-full max-w-2xl mx-auto">
-            <div
-              className={`${theme.card} h-[510px] p-6 rounded-2xl shadow-lg w-full`}
-            >
-              <form onSubmit={onSubmit}>
-                <div className="mb-4">
-                  <label
-                    className="block text-left text-gray-300 font-bold mb-2"
-                    id="selectVideoLabel"
-                  >
+
+          <div className="flex flex-col gap-8 w-full max-w-3xl mx-auto">
+            {/* Main Upload Card */}
+            <div className={`${theme.card} p-8 rounded-3xl shadow-2xl border border-gray-700/50 backdrop-blur-lg transition-all duration-300`}>
+              <form onSubmit={onSubmit} className="space-y-6">
+                {/* Error Message */}
+                {errorMessage && (
+                  <div className="bg-red-500/20 border border-red-500 text-red-100 px-4 py-3 rounded-lg mb-6 flex items-center justify-between">
+                    <span>{errorMessage}</span>
+                    <button 
+                      type="button" 
+                      onClick={() => setErrorMessage("")}
+                      className="text-red-100 hover:text-white"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+
+                {/* File Upload Area */}
+                <div className="space-y-4">
+                  <label className="block text-left text-gray-300 font-medium mb-2" id="selectVideoLabel">
                     {selectedLanguage.selectVideoLabel}
                   </label>
                   <div
-                    className={`w-full h-62 border-dashed border-2 border-gray-400 flex items-center justify-center ${theme.input}`}
-                    style={{
-                      cursor: isAddingSubtitles ? "not-allowed" : "pointer",
-                    }}
-                    onClick={() =>
-                      !isAddingSubtitles &&
-                      document.getElementById("videoInput").click()
-                    }
+                    className={`
+                      w-full h-48 border-3 border-dashed 
+                      ${isAddingSubtitles ? 'border-purple-500/30' : 'border-gray-600 hover:border-purple-500/50'} 
+                      rounded-2xl transition-all duration-300 ease-in-out
+                      flex flex-col items-center justify-center
+                      ${theme.input} cursor-pointer
+                      group
+                    `}
+                    onClick={() => !isAddingSubtitles && document.getElementById("videoInput").click()}
                     onDrop={(e) => {
                       e.preventDefault();
                       if (isAddingSubtitles) return;
                       const files = e.dataTransfer.files;
-                      if (
-                        files.length > 0 &&
-                        files[0].type.startsWith("video/")
-                      ) {
+                      if (files.length > 0 && files[0].type.startsWith("video/")) {
                         setFile(files[0]);
                         setFileName(files[0].name);
                       } else {
-                        alert("Please drop a valid video file.");
+                        setErrorMessage("Please drop a valid video file.");
                       }
                     }}
                     onDragOver={(e) => e.preventDefault()}
                   >
-                    <p className="text-[#FAF3E0]">
-                      {isAddingSubtitles
-                        ? "Processing..."
-                        : file
-                        ? fileName
-                        : selectedLanguage.dragAndDropMessage}
+                    {/* Upload Icon */}
+                    <svg 
+                      className={`w-12 h-12 mb-4 ${isAddingSubtitles ? 'text-purple-500' : 'text-gray-500 group-hover:text-purple-400'} transition-colors duration-300`}
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth={2} 
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
+                    </svg>
+                    
+                    <p className={`text-lg ${isAddingSubtitles ? 'text-purple-400' : 'text-gray-400 group-hover:text-gray-300'} transition-colors duration-300`}>
+                      {isAddingSubtitles ? "Processing..." : file ? fileName : selectedLanguage.dragAndDropMessage}
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    className={`${theme.button} text-white hover:bg-[#f74040] mt-30 px-6 py-3 rounded-xl w-full font-semibold text-lg shadow-md hover:shadow-lg transition-all cursor-pointer duration-200`}
-                    id="chooseButton"
-                    onClick={() =>
-                      processingStatus === "idle" &&
-                      document.getElementById("videoInput").click()
-                    }
-                    style={{
-                      display:
-                        (!file &&
-                          !isUploading &&
-                          !isAddingSubtitles &&
-                          processingStatus === "idle") ||
-                        isDownloadComplete
-                          ? "block"
-                          : "none",
-                    }}
-                    disabled={processingStatus !== "idle"}
-                  >
-                    {selectedLanguage.selectVideoLabel}
-                  </button>
+                  {/* Subtitle Options */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    {/* Font Selection */}
+                    <div>
+                      <label className="block text-left text-gray-400 text-sm mb-2">
+                        {selectedLanguage.selectSubtitleFontLabel}
+                      </label>
+                      <select
+                        className={`${theme.input} w-full rounded-lg px-3 py-2 border border-gray-700 focus:border-purple-500 transition-colors duration-300`}
+                        value={subtitleFont}
+                        onChange={(e) => setSubtitleFont(e.target.value)}
+                      >
+                        <option value="Arial">Arial</option>
+                        <option value="Helvetica">Helvetica</option>
+                        <option value="Chantilly">Chantilly</option>
+                      </select>
+                    </div>
+
+                    {/* Color Selection */}
+                    <div>
+                      <label className="block text-left text-gray-400 text-sm mb-2">
+                        {selectedLanguage.selectSubtitleColorLabel}
+                      </label>
+                      <select
+                        className={`${theme.input} w-full rounded-lg px-3 py-2 border border-gray-700 focus:border-purple-500 transition-colors duration-300`}
+                        value={subtitleColor}
+                        onChange={(e) => setSubtitleColor(e.target.value)}
+                      >
+                        <option value="white">White</option>
+                        <option value="yellow">Yellow</option>
+                        <option value="green">Green</option>
+                      </select>
+                    </div>
+
+                    {/* Size Selection */}
+                    <div>
+                      <label className="block text-left text-gray-400 text-sm mb-2">
+                        {selectedLanguage.selectSubtitleSizeLabel}
+                      </label>
+                      <select
+                        className={`${theme.input} w-full rounded-lg px-3 py-2 border border-gray-700 focus:border-purple-500 transition-colors duration-300`}
+                        value={subtitleSize}
+                        onChange={(e) => setSubtitleSize(e.target.value)}
+                      >
+                        <option value="small">Small</option>
+                        <option value="medium">Medium</option>
+                        <option value="large">Large</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Hidden File Input */}
                   <input
-                    className={`w-full h-32 border-dashed border-2 border-gray-400 flex items-center justify-center ${theme.input}`}
                     id="videoInput"
                     name="video"
                     type="file"
                     accept="video/*"
-                    style={{ display: "none" }}
+                    className="hidden"
                     onChange={(e) => {
-                      if (
-                        e.target.files.length > 0 &&
-                        e.target.files[0].type.startsWith("video/")
-                      ) {
+                      if (e.target.files.length > 0 && e.target.files[0].type.startsWith("video/")) {
                         setFile(e.target.files[0]);
                         setFileName(e.target.files[0].name);
                       } else {
                         setFile(null);
                         setFileName("");
-                        alert("Please select a valid video file.");
+                        setErrorMessage("Please select a valid video file.");
                       }
                     }}
                     disabled={processingStatus !== "idle"}
                   />
 
-                  <div className="space-y-4">
-                    <button
-                      type="button"
-                      className={`${theme.button} ${
-                        isUploading || processingStatus !== "idle"
-                          ? "bg-gray-400"
-                          : "text-white cursor-pointer hover:bg-[#f74040]"
-                      } mt-30 px-6 py-3 rounded-xl w-full font-semibold text-lg shadow-md hover:shadow-lg transition-all`}
-                      id="uploadButton"
-                      onClick={onSubmit}
-                      style={{
-                        display:
-                          file &&
-                          !isAddingSubtitles &&
-                          processingStatus !== "ready"
-                            ? "block"
-                            : "none",
-                      }}
-                      disabled={
-                        processingStatus !== "idle" || isUploading || !file
-                      }
-                    >
-                      {isUploading ? (
-                        <>
-                          Uploading{" "}
+                  {/* Action Buttons */}
+                  <div className="space-y-4 mt-6">
+                    {/* Upload Button */}
+                    {file && !isAddingSubtitles && processingStatus !== "ready" && (
+                      <button
+                        type="submit"
+                        className={`
+                          ${theme.button} ${theme.buttonHover}
+                          w-full py-4 rounded-xl font-semibold text-lg
+                          shadow-lg shadow-purple-500/20
+                          transform transition-all duration-300
+                          hover:shadow-purple-500/30 hover:scale-[1.02]
+                          disabled:opacity-50 disabled:cursor-not-allowed
+                          flex items-center justify-center gap-3
+                        `}
+                        disabled={processingStatus !== "idle" || isUploading}
+                      >
+                        {isUploading ? (
+                          <>
+                            <img
+                              src="/spinning.gif"
+                              alt="Loading"
+                              className="w-6 h-6 animate-spin"
+                            />
+                            <span>Uploading...</span>
+                          </>
+                        ) : (
+                          selectedLanguage.uploadButton
+                        )}
+                      </button>
+                    )}
+
+                    {/* Processing Indicator */}
+                    {isAddingSubtitles && (
+                      <div className="flex flex-col items-center justify-center py-6">
+                        <div className="relative">
                           <img
                             src="/spinning.gif"
-                            alt="Loading"
-                            className="inline-block w-4 h-4 animate-spin duration-1000 ease-linear"
+                            alt="Processing"
+                            className="w-16 h-16 animate-spin"
                           />
-                        </>
-                      ) : (
-                        selectedLanguage.uploadButton
-                      )}
-                    </button>
-
-                    {isAddingSubtitles && (
-                      <div className="flex flex-col items-center justify-center mt-4">
-                        <img
-                          src="/spinning.gif"
-                          alt="Loading"
-                          className="w-16 h-16 mt-10 animate-spin duration-1000 ease-linear"
-                        />
-                        <p className="text-gray-300 mt-2">
-                          {fileDetectedTime
-                            ? "Finalizing video..."
-                            : "Adding subtitles..."}
+                          <div className="absolute inset-0 bg-gradient-to-t from-gray-800/50 via-transparent to-transparent rounded-full" />
+                        </div>
+                        <p className="text-purple-300 mt-4 text-lg">
+                          {fileDetectedTime ? "Finalizing video..." : "Adding subtitles..."}
                         </p>
                       </div>
                     )}
-                  </div>
 
-                  <button
-                    type="button"
-                    className={`${theme.button} text-white mt-30 px-6 py-3 rounded-xl w-full font-semibold text-lg hover:bg-[#f74040] shadow-md hover:shadow-lg transition-all cursor-pointer`}
-                    id="downloadButton"
-                    style={{
-                      display: processingStatus === "ready" ? "block" : "none",
-                    }}
-                    onClick={async () => {
-                      try {
-                        const videoPath = `tmp/${sessionId}/video_with_subtitles.mp4`;
-                        const response = await fetch(videoPath);
-                        if (!response.ok) {
-                          console.error(
-                            "Failed to fetch video:",
-                            response.statusText
-                          );
-                          return;
-                        }
+                    {/* Download Button */}
+                    {processingStatus === "ready" && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const videoPath = `tmp/${sessionId}/video_with_subtitles.mp4`;
+                            const response = await fetch(videoPath);
+                            if (!response.ok) throw new Error("Failed to fetch video");
 
-                        const blob = await response.blob();
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.style.display = "none";
-                        a.href = url;
-                        a.download = "video_with_subtitles.mp4";
+                            const blob = await response.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.style.display = "none";
+                            a.href = url;
+                            a.download = "video_with_subtitles.mp4";
+                            document.body.appendChild(a);
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                            document.body.removeChild(a);
 
-                        await new Promise((resolve) => {
-                          a.addEventListener("click", resolve, { once: true });
-                          a.click();
-                        });
+                            setProcessingStatus("idle");
+                            setFile(null);
+                            setFileName("");
+                            setProcessedVideoPath("");
+                            setIsDownloadComplete(true);
 
-                        window.URL.revokeObjectURL(url);
-                        setProcessingStatus("idle");
-                        setFile(null);
-                        setFileName("");
-                        setProcessedVideoPath("");
-                        setIsDownloadComplete(true);
-
-                        await new Promise((resolve) =>
-                          setTimeout(resolve, 2000)
-                        );
-
-                        try {
-                          const cleanupResponse = await fetch(
-                            "/api/upload/cleanup",
-                            {
+                            // Cleanup after download
+                            await fetch("/api/upload/cleanup", {
                               method: "POST",
-                              headers: {
-                                "Content-Type": "application/json",
-                              },
+                              headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({ sessionId }),
-                            }
-                          );
-
-                          if (!cleanupResponse.ok) {
-                            console.error(
-                              "Failed to cleanup files:",
-                              cleanupResponse.statusText
-                            );
+                            });
+                          } catch (error) {
+                            setErrorMessage("Error downloading the video. Please try again.");
+                            console.error("Download error:", error);
                           }
-                        } catch (cleanupError) {
-                          console.error("Error during cleanup:", cleanupError);
-                        }
-                      } catch (error) {
-                        console.error(
-                          "Error during download and cleanup:",
-                          error
-                        );
-                      }
-                    }}
-                  >
-                    {selectedLanguage.downloadButton}
-                  </button>
+                        }}
+                        className={`
+                          ${theme.button} ${theme.buttonHover}
+                          w-full py-4 rounded-xl font-semibold text-lg
+                          shadow-lg shadow-purple-500/20
+                          transform transition-all duration-300
+                          hover:shadow-purple-500/30 hover:scale-[1.02]
+                          flex items-center justify-center gap-2
+                        `}
+                      >
+                        <svg 
+                          className="w-6 h-6" 
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                            strokeWidth={2} 
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                          />
+                        </svg>
+                        {selectedLanguage.downloadButton}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </form>
             </div>
-            <div className="text-center mb-10">
-              <h2 className="text-3xl font-bold mb-6" id="livePreviewTitle">
-                {selectedLanguage.livePreviewTitle}
-              </h2>
-              <div className=" md:mb-20">
-                <div className="flex justify-center w-full">
-                  <video
-                    className="w-full md:w-2/3 lg:w-1/2 max-w-md h-auto max-h-[70vh] md:max-h-none"
-                    loop
-                    autoPlay
-                    muted
-                    playsInline
-                    onCanPlay={(e) => e.target.play()}
-                  >
-                    <source src={videoSrc} type="video/mp4" />
-                    Your browser does not support the video tag.
-                  </video>
-                </div>
-              </div>
-            </div>
+
           </div>
         </section>
       </main>
+      
       <Footer />
     </div>
   );
