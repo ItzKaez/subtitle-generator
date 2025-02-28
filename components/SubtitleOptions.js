@@ -9,6 +9,8 @@ const SubtitleOptions = ({ options, onChange, disabled }) => {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+
+
       {/* Font Selection */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-300">
@@ -83,31 +85,6 @@ const SubtitleOptions = ({ options, onChange, disabled }) => {
         </select>
       </div>
 
-      {/* Preview */}
-      <div className="md:col-span-3 mt-4">
-        <div className={`
-          w-full h-24 rounded-lg
-          bg-gradient-to-r from-gray-900 to-gray-800
-          flex items-center justify-center
-          border border-gray-700
-          overflow-hidden
-          relative
-        `}>
-          <div className="absolute inset-0 bg-black/50" />
-          <p className={`
-            relative z-10
-            text-${color === 'white' ? 'gray-100' : color}-400
-            ${size === 'small' ? 'text-sm' : 
-              size === 'medium' ? 'text-base' : 
-              size === 'large' ? 'text-lg' : 
-              'text-xl'
-            }
-            font-${font.toLowerCase().replace(' ', '-')}
-          `}>
-            Preview Subtitle Text
-          </p>
-        </div>
-      </div>
     </div>
   );
 };
