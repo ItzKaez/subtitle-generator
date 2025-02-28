@@ -1,6 +1,19 @@
-opencv-python
-tqdm
-openai-whisper
-moviepy
-customtkinter
-whisper
+# Core dependencies
+opencv-python==4.8.1.78
+moviepy==1.0.3
+openai-whisper==20231117
+tqdm==4.66.1
+numpy==1.26.2
+Pillow==10.1.0
+
+# Additional utilities
+python-dotenv==1.0.0
+requests==2.31.0
+
+# Optional: GUI dependencies (if needed)
+customtkinter==5.2.1
+
+# Development dependencies (optional)
+pytest==7.4.3
+black==23.11.0
+flake8==6.1.0

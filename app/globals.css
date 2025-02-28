@@ -1,25 +1,185 @@
-@import "tailwindcss";
-
-
-@theme {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+@import 'tailwindcss';
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 28, 30, 42;
+  --background-end-rgb: 28, 30, 42;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+    to bottom,
+    rgb(var(--background-start-rgb)),
+    rgb(var(--background-end-rgb))
+  );
+}
+
+/* Custom Animations */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(var(--background-start-rgb));
+}
+
+::-webkit-scrollbar-thumb {
+  background: #FF7B7B;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #FF5F5F;
+}
+
+/* Custom Range Input Styling */
+input[type="range"] {
+  @apply appearance-none bg-gray-700 h-2 rounded-lg;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  @apply appearance-none w-4 h-4 rounded-full bg-[#FF7B7B] cursor-pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  @apply w-4 h-4 rounded-full bg-[#FF7B7B] cursor-pointer border-0;
+}
+
+/* File Upload Drag & Drop Zone */
+.drag-active {
+  @apply border-[#FF7B7B] bg-[#FF7B7B]/10;
+}
+
+/* Loading Spinner */
+.spinner {
+  @apply animate-spin rounded-full border-4 border-[#FF7B7B] border-t-transparent;
+}
+
+/* Video Preview Controls */
+.video-controls {
+  @apply opacity-0 transition-opacity duration-300;
+}
+
+.video-container:hover .video-controls {
+  @apply opacity-100;
+}
+
+/* Subtitle Preview */
+.subtitle-preview {
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Progress Bar Animation */
+.progress-bar-animated {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 123, 123, 0.8) 0%,
+    rgba(255, 95, 95, 1) 50%,
+    rgba(255, 123, 123, 0.8) 100%
+  );
+  background-size: 200% 100%;
+  animation: gradient 2s linear infinite;
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Button Hover Effects */
+.hover-effect {
+  @apply transition-all duration-300 transform hover:scale-105;
+}
+
+.hover-effect:active {
+  @apply scale-95;
+}
+
+/* Error Message Animation */
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+.error-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Font Loading */
+@font-face {
+  font-family: 'Chantilly';
+  src: url('/src/chantilly.TTF') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Responsive Video Container */
+.video-aspect-ratio {
+  aspect-ratio: 16 / 9;
+}
+
+@supports not (aspect-ratio: 16 / 9) {
+  .video-aspect-ratio::before {
+    float: left;
+    padding-top: 56.25%;
+    content: '';
+  }
+  
+  .video-aspect-ratio::after {
+    display: block;
+    content: '';
+    clear: both;
+  }
+}
+
+/* Tooltip */
+.tooltip {
+  @apply invisible absolute;
+}
+
+.has-tooltip:hover .tooltip {
+  @apply visible z-50;
+}
+
+/* Custom Selection Color */
+::selection {
+  background: rgba(255, 123, 123, 0.3);
+  color: white;
+}
+
+/* Focus Outline */
+:focus {
+  @apply outline-none ring-2 ring-[#FF7B7B];
+}
+
+/* Disable Tap Highlight on Mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
 }

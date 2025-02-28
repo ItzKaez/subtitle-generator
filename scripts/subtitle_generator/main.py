@@ -9,87 +9,80 @@ import numpy as np
 import re
 from PIL import Image, ImageDraw, ImageFont
 import sys
+import argparse
+from logger import setup_logger
+from session_manager import SessionManager
+from exceptions import (
+    FontNotFoundError, VideoProcessingError, AudioExtractionError,
+    TranscriptionError, FrameExtractionError, VideoCreationError,
+    ValidationError
+)
 
-
-# Paramètres garantis visibles
-FONT_PATH = './src/chantilly.TTF'
-FONT_SIZE = 80
-TEXT_COLOR = (255, 255, 255)  # Blanc pour visibilité
-OUTLINE_COLOR = (0, 0, 0)  # Contour noir
-OUTLINE_THICKNESS = 12  # Définir l'épaisseur du contour
-
-if not os.path.exists(FONT_PATH):
-    print(f"Police introuvable: {FONT_PATH}")
-
-
-def align_sequences(seq1, seq2):
-    # Initialisation de la matrice de score
-    n = len(seq1)
-    m = len(seq2)
-    score = np.zeros((n + 1, m + 1))
-    for i in range(1, n + 1):
-        score[i][0] = i
-    for j in range(1, m + 1):
-        score[0][j] = j
-
-    # Remplissage de la matrice de score
-    for i in range(1, n + 1):
-        for j in range(1, m + 1):
-            match = score[i - 1][j - 1] + (0 if seq1[i - 1] == seq2[j - 1] else 1)
-            delete = score[i - 1][j] + 1
-            insert = score[i][j - 1] + 1
-            score[i][j] = min(match, delete, insert)
-
-    # Backtracking pour trouver l'alignement
-    align1 = []
-    align2 = []
-    i, j = n, m
-    while i > 0 and j > 0:
-        if score[i][j] == score[i - 1][j - 1] + (0 if seq1[i - 1] == seq2[j - 1] else 1):
-            align1.append(seq1[i - 1])
-            align2.append(seq2[j - 1])
-            i -= 1
-            j -= 1
-        elif score[i][j] == score[i - 1][j] + 1:
-            align1.append(seq1[i - 1])
-            align2.append(None)
-            i -= 1
-        else:
-            align1.append(None)
-            align2.append(seq2[j - 1])
-            j -= 1
-
-    while i > 0:
-        align1.append(seq1[i - 1])
-        align2.append(None)
-        i -= 1
-
-    while j > 0:
-        align1.append(None)
-        align2.append(seq2[j - 1])
-        j -= 1
-
-    align1.reverse()
-    align2.reverse()
-    return align1, align2
+# ... (previous code remains the same until VideoTranscriber class) ...
 
 class VideoTranscriber:
-    def __init__(self, model_path, video_path, transcription_text=None):
-        self.model = whisper.load_model(model_path)
-        self.video_path = video_path
-        self.audio_path = ''
-        self.word_timings = []
-        self.fps = 0
-        self.transcription_words = self.load_transcription(transcription_text) if transcription_text else []
+    def __init__(self, model_path, video_path, transcription_text=None, session_id=None, font_path=None, font_size=80, text_color=(255, 255, 255)):
+        self.session_id = session_id or 'default_session'
+        self.logger = setup_logger(self.session_id)
+        self.session_manager = SessionManager(self.session_id)
+        
+        try:
+            self.model = whisper.load_model(model_path)
+            self.video_path = video_path
+            self.audio_path = ''
+            self.word_timings = []
+            self.fps = 0
+            self.transcription_words = self.load_transcription(transcription_text) if transcription_text else []
+            self.font_path = font_path
+            self.font_size = font_size
+            self.text_color = text_color
+            
+            # Setup session directories
+            if not self.session_manager.setup_session():
+                raise SessionError("Failed to setup session directories", self.session_id)
+                
+            self.logger.info(f"VideoTranscriber initialized with video: {video_path}")
+            
+        except Exception as e:
+            raise VideoProcessingError(f"Error initializing VideoTranscriber: {str(e)}")
 
     def load_transcription(self, transcription_text):
+        """Load and normalize transcription text."""
+        if not transcription_text:
+            return []
         words = re.findall(r'\b\w+\b', transcription_text)
-        return [normalize_text(word) for word in words]
+        return [self.normalize_text(word) for word in words]
+
+    def normalize_text(self, text):
+        """Normalize text by removing accents and special characters."""
+        if not text:
+            return ""
+        text = unicodedata.normalize('NFKD', text)
+        text = text.encode('ascii', 'ignore')
+        text = text.decode('ascii')
+        text = re.sub(r'[^a-zA-Z0-9\s]', '', text)
+        return text.upper()
+
+    def extract_audio(self):
+        """Extract audio from video file."""
+        self.logger.info("Extracting audio from video...")
+        try:
+            audio_path = os.path.join(self.session_manager.session_dir, "audio.mp3")
+            video = VideoFileClip(self.video_path)
+            audio = video.audio
+            audio.write_audiofile(audio_path)
+            self.audio_path = audio_path
+            video.close()
+            self.logger.info("Audio extraction completed successfully")
+        except Exception as e:
+            raise AudioExtractionError(f"Error extracting audio: {str(e)}")
 
     def transcribe_video(self):
-        print("Analyse audio...")
+        """Transcribe video audio and align with provided transcription."""
+        self.logger.info("Starting video transcription...")
         try:
             result = self.model.transcribe(self.video_path, word_timestamps=True)
+            
             cap = cv2.VideoCapture(self.video_path)
             self.fps = cap.get(cv2.CAP_PROP_FPS)
             cap.release()
@@ -100,16 +93,18 @@ class VideoTranscriber:
                     word = word_item.get("word", "").strip()
                     if word:
                         detected_words.append({
-                            "text": normalize_text(word),
+                            "text": self.normalize_text(word),
                             "start": int(word_item["start"] * self.fps),
                             "end": int(word_item["end"] * self.fps)
                         })
 
             if not self.transcription_words:
-                # Si aucune transcription n'est fournie, utilisez les mots détectés
                 self.transcription_words = [w["text"] for w in detected_words]
 
-            aligned_transcription, aligned_detected = align_sequences(self.transcription_words, [w["text"] for w in detected_words])
+            aligned_transcription, aligned_detected = self.align_sequences(
+                self.transcription_words,
+                [w["text"] for w in detected_words]
+            )
 
             self.word_timings = []
             detected_index = 0
@@ -130,17 +125,79 @@ class VideoTranscriber:
                 elif det_word is not None:
                     detected_index += 1
 
-            print(f"Mots synchronisés: {len(self.word_timings)}")
+            self.logger.info(f"Transcription completed. Words synchronized: {len(self.word_timings)}")
 
         except Exception as e:
-            print(f"Erreur transcription: {str(e)}")
+            raise TranscriptionError(f"Error during transcription: {str(e)}")
 
-
-    def extract_frames(self, output_folder, session_id):
-
-        print("Applying subtitles...")
+    def align_sequences(self, seq1, seq2):
+        """Align two sequences using dynamic programming."""
         try:
+            n, m = len(seq1), len(seq2)
+            score = np.zeros((n + 1, m + 1))
+            
+            # Initialize score matrix
+            for i in range(1, n + 1):
+                score[i][0] = i
+            for j in range(1, m + 1):
+                score[0][j] = j
+
+            # Fill score matrix
+            for i in range(1, n + 1):
+                for j in range(1, m + 1):
+                    match = score[i - 1][j - 1] + (0 if seq1[i - 1] == seq2[j - 1] else 1)
+                    delete = score[i - 1][j] + 1
+                    insert = score[i][j - 1] + 1
+                    score[i][j] = min(match, delete, insert)
+
+            # Backtrack to find alignment
+            align1, align2 = [], []
+            i, j = n, m
+            
+            while i > 0 and j > 0:
+                if score[i][j] == score[i - 1][j - 1] + (0 if seq1[i - 1] == seq2[j - 1] else 1):
+                    align1.append(seq1[i - 1])
+                    align2.append(seq2[j - 1])
+                    i -= 1
+                    j -= 1
+                elif score[i][j] == score[i - 1][j] + 1:
+                    align1.append(seq1[i - 1])
+                    align2.append(None)
+                    i -= 1
+                else:
+                    align1.append(None)
+                    align2.append(seq2[j - 1])
+                    j -= 1
+
+            while i > 0:
+                align1.append(seq1[i - 1])
+                align2.append(None)
+                i -= 1
+
+            while j > 0:
+                align1.append(None)
+                align2.append(seq2[j - 1])
+                j -= 1
+
+            align1.reverse()
+            align2.reverse()
+            return align1, align2
+
+        except Exception as e:
+            raise VideoProcessingError(f"Error aligning sequences: {str(e)}")
+
+    def create_video(self, output_path):
+        """Create final video with subtitles."""
+        self.logger.info("Creating final video...")
+        try:
+            frames_dir = os.path.join(self.session_manager.session_dir, "frames")
+            os.makedirs(frames_dir, exist_ok=True)
+
+            # Extract frames with subtitles
             cap = cv2.VideoCapture(self.video_path)
+            if not cap.isOpened():
+                raise FrameExtractionError("Failed to open video file")
+
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -149,178 +206,143 @@ class VideoTranscriber:
                 for frame_count in range(total_frames):
                     ret, frame = cap.read()
                     if not ret:
-                        break
+                        raise FrameExtractionError(f"Failed to read frame {frame_count}")
 
-                    # Recherche du mot actuel
-
-                    current_word = next((w for w in self.word_timings 
-                                       if w["start"] <= frame_count <= w["end"]), None)
+                    current_word = next(
+                        (w for w in self.word_timings if w["start"] <= frame_count <= w["end"]),
+                        None
+                    )
 
                     if current_word:
-                        text = current_word["text"]
-                        
-                        # Convertir l'image OpenCV en image PIL
-                        image_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                        draw = ImageDraw.Draw(image_pil)
-                        font = ImageFont.truetype(FONT_PATH, FONT_SIZE)
-                        
-                        # Position centrale garantie
-                        text_bbox = draw.textbbox((0, 0), text, font=font)
-                        text_width = text_bbox[2] - text_bbox[0]
-                        text_height = text_bbox[3] - text_bbox[1]
-                        x = (width - text_width) // 2
-                        y = (height + text_height) // 2 + 50  # Décalage vers le bas
-                        
-                        # Dessiner le texte avec contour
-                        for dx in range(-OUTLINE_THICKNESS, OUTLINE_THICKNESS + 1):
-                            for dy in range(-OUTLINE_THICKNESS, OUTLINE_THICKNESS + 1):
-                                if dx != 0 or dy != 0:
-                                    draw.text((x + dx, y + dy), text, font=font, fill=OUTLINE_COLOR)
-                        draw.text((x, y), text, font=font, fill=TEXT_COLOR)
-                        
-                        # Convertir l'image PIL en image OpenCV
-                        frame = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
+                        frame = self.add_subtitle_to_frame(frame, current_word["text"], width, height)
 
-                    cv2.imwrite(os.path.join(output_folder, f"{frame_count}.jpg"), frame)
-
-                    if frame_count % 10 == 0:  # Update progress every 10 frames
-                        progress = 70 + int(25 * (frame_count / total_frames))
-                        session_id = os.environ.get('SESSION_ID', 'default_session')
-
-                        sys.stdout.flush()
+                    output_path = os.path.join(frames_dir, f"{frame_count:08d}.jpg")
+                    cv2.imwrite(output_path, frame)
                     pbar.update(1)
 
-
-
             cap.release()
-            session_id = os.environ.get('SESSION_ID', 'default_session')
 
-            sys.stdout.flush()
+            # Create video from frames
+            images = sorted([f for f in os.listdir(frames_dir) if f.endswith('.jpg')])
+            if not images:
+                raise VideoCreationError("No frames found for video creation")
+            
+            frame_paths = [os.path.join(frames_dir, img) for img in images]
+            clip = ImageSequenceClip(frame_paths, fps=self.fps)
+            
+            # Add audio if available
+            if os.path.exists(self.audio_path):
+                audio = AudioFileClip(self.audio_path)
+                clip = clip.set_audio(audio)
+            
+            # Write final video
+            clip.write_videofile(output_path)
+            clip.close()
 
-
+            # Cleanup temporary files
+            shutil.rmtree(frames_dir)
+            if os.path.exists(self.audio_path):
+                os.remove(self.audio_path)
+            
+            self.logger.info(f"Video created successfully: {output_path}")
+            
         except Exception as e:
-            print(f"Erreur traitement: {str(e)}")
+            raise VideoCreationError(f"Error creating video: {str(e)}")
 
-    def create_video(self, output_video_path):
-        print('Creating video')
+    def add_subtitle_to_frame(self, frame, text, width, height):
+        """Add subtitle text to a video frame."""
         try:
-            image_folder = os.path.join(os.path.dirname(self.video_path), "frames")
-            # Ensure frames directory exists
-            os.makedirs(image_folder, exist_ok=True)
+            image_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            draw = ImageDraw.Draw(image_pil)
+            font = ImageFont.truetype(self.font_path, self.font_size)
             
-            self.extract_frames(image_folder, session_id)
-
-
-
-
+            # Calculate text position
+            text_bbox = draw.textbbox((0, 0), text, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            text_height = text_bbox[3] - text_bbox[1]
+            x = (width - text_width) // 2
+            y = height - text_height - 50  # Position above bottom
             
-            images = [img for img in os.listdir(image_folder) if img.endswith(".jpg")]
-            images.sort(key=lambda x: int(x.split(".")[0]))
+            # Draw outline
+            outline_color = (0, 0, 0)  # Black outline
+            outline_thickness = 3
+            for dx in range(-outline_thickness, outline_thickness + 1):
+                for dy in range(-outline_thickness, outline_thickness + 1):
+                    if dx != 0 or dy != 0:
+                        draw.text((x + dx, y + dy), text, font=font, fill=outline_color)
             
-            clip = ImageSequenceClip([os.path.join(image_folder, image) 
-                                     for image in images], fps=self.fps)
-            audio = AudioFileClip(self.audio_path)
-            clip = clip.set_audio(audio)
-            clip.write_videofile(output_video_path)
-            # Clean up frames directory
-            for filename in os.listdir(image_folder):
-                file_path = os.path.join(image_folder, filename)
-                try:
-                    if os.path.isfile(file_path) or os.path.islink(file_path):
-                        os.unlink(file_path)
-                    elif os.path.isdir(file_path):
-                        shutil.rmtree(file_path)
-                except Exception as e:
-                    print(f'Failed to delete {file_path}. Reason: {e}')
+            # Draw main text
+            draw.text((x, y), text, font=font, fill=self.text_color)
             
-            # Remove empty frames directory
-            try:
-                os.rmdir(image_folder)
-            except Exception as e:
-                print(f'Failed to remove directory {image_folder}. Reason: {e}')
-
-
-            
-            # Remove audio file
-            try:
-                os.remove(os.path.join(os.path.dirname(self.video_path), "audio.mp3"))
-            except Exception as e:
-                print(f'Failed to remove audio file. Reason: {e}')
-
+            return cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
         except Exception as e:
-            print(f"Error creating video: {e}")
-            
-    def extract_audio(self):
-        print('Extracting audio')
-        try:
-            audio_path = os.path.join(os.path.dirname(self.video_path), "audio.mp3")
-            video = VideoFileClip(self.video_path)
-            audio = video.audio 
-            audio.write_audiofile(audio_path)
-            self.audio_path = audio_path
-            print('Audio extracted')
-        except Exception as e:
-            print(f"Error during audio extraction: {e}")
+            raise VideoProcessingError(f"Error adding subtitle to frame: {str(e)}")
 
-def normalize_text(text):
-    text = unicodedata.normalize('NFKD', text)
-    text = text.encode('ascii', 'ignore')
-    text = text.decode('ascii')
-    text = re.sub(r'[^a-zA-Z0-9\s]', '', text)
-    return text.upper()
 
-def put_subtitles(video_path, transcription_text=None, session_id=None):
-
+def put_subtitles(video_path, transcription_text=None, session_id=None, font_name='Chantilly', color_name='white', size_name='medium'):
+    """
+    Main function to add subtitles to a video.
+    """
+    logger = setup_logger(session_id or 'default_session')
+    logger.info("Starting subtitle generation process...")
+    
     try:
-        print("\n=== Starting Subtitle Processing ===")
-        print(f"Input video: {video_path}")
+        # Validate inputs
+        if not os.path.exists(video_path):
+            raise ValidationError("Video file not found", "video_path")
         
+        # Get font and color configurations
+        font_path, font_size = get_font_config(font_name, size_name)
+        text_color = get_color_config(color_name)
+        
+        # Setup paths
         model_path = "base"
-        output_video_path = f"public/tmp/{session_id}/video_with_subtitles.mp4"  # Ensure output path uses session ID
+        output_video_path = f"public/tmp/{session_id}/video_with_subtitles.mp4"
         
-        session_id = os.environ.get('SESSION_ID', 'default_session')
-        sys.stdout.flush()
-
-        sys.stdout.flush()
-        transcriber = VideoTranscriber(model_path, video_path, transcription_text)
+        # Process video
+        transcriber = VideoTranscriber(
+            model_path=model_path,
+            video_path=video_path,
+            transcription_text=transcription_text,
+            session_id=session_id,
+            font_path=font_path,
+            font_size=font_size,
+            text_color=text_color
+        )
         
-        sys.stdout.flush()
         transcriber.extract_audio()
-        sys.stdout.flush()
         transcriber.transcribe_video()
-        
-
-
-        sys.stdout.flush()
         transcriber.create_video(output_video_path)
-
         
-        print(f"Output video: {output_video_path}")
-
+        logger.info("Subtitle generation completed successfully")
         return output_video_path
+        
     except Exception as e:
-        print("\n!!! Error processing subtitles !!!")
-        print(f"Error details: {str(e)}")
-        print("Stack trace:")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error in subtitle generation: {str(e)}")
         raise
 
-
-
-
-#put_subtitles('E:/Users/danie/Bureau/Perso/Projets/subtitles_webapp/subtitle-generator/tmp/video_without_subtitles.mp4', None)
-
-if __name__ == "__main__":
-    if len(sys.argv) < 4 or sys.argv[1] != 'put_subtitles':
-        print("Usage: python main.py put_subtitles <video_path> [transcription_text] <session_id>")
+def main():
+    try:
+        args = parse_arguments()
+        
+        if args.command == 'put_subtitles':
+            # Set session ID as environment variable
+            os.environ['SESSION_ID'] = args.session_id
+            
+            output_path = put_subtitles(
+                args.video_path,
+                args.transcription,
+                args.session_id,
+                args.font,
+                args.color,
+                args.size
+            )
+            print(f"Successfully generated video with subtitles: {output_path}")
+            sys.exit(0)
+            
+    except Exception as e:
+        print(f"Error: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
-    video_path = sys.argv[2]
-    transcription_text = sys.argv[3] if len(sys.argv) > 4 else None
-    session_id = sys.argv[4] if len(sys.argv) > 4 else sys.argv[3]
-    
-    # Set session ID as environment variable
-    os.environ['SESSION_ID'] = session_id
-    
-    put_subtitles(video_path, transcription_text, session_id)
+if __name__ == "__main__":
+    main()

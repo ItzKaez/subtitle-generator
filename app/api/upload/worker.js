@@ -1,63 +1,194 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { io } from 'socket.io-client';
+import { exec } from 'child_process';
+import { FileHandler, ProgressTracker } from '@/app/utils/fileHandler';
 
-export async function processUpload(file, sessionId) {
-  const uploadDir = path.join(process.cwd(), 'public/tmp', sessionId); // Modifié ici
-  await fs.mkdir(uploadDir, { recursive: true });
-  const filePath = path.join(uploadDir, "video_without_subtitles.mp4");
+// Get the project root directory
+const getProjectRoot = () => {
+  return process.cwd();
+};
 
-  console.log("worker session_id", sessionId)
-  
-  // Create WebSocket connection
-  const baseUrl = process.env.NODE_ENV === 'production' 
-    ? process.env.NEXT_PUBLIC_BASE_URL 
-    : 'http://localhost:3000';
-  const socket = io(baseUrl);
-
+// Check if a file exists using async fs
+async function fileExists(filePath) {
   try {
-    // Ensure the upload directory exists
-    await fs.mkdir(uploadDir, { recursive: true });
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Verify required files exist
+async function verifyRequiredFiles(projectRoot) {
+  const fontPath = path.join(projectRoot, 'src', 'chantilly.TTF');
+  const scriptPath = path.join(projectRoot, 'scripts', 'subtitle_generator', 'main.py');
+
+  const errors = [];
+
+  if (!await fileExists(fontPath)) {
+    errors.push(`Font file not found at: ${fontPath}`);
+  }
+
+  if (!await fileExists(scriptPath)) {
+    errors.push(`Script not found at: ${scriptPath}`);
+  }
+
+  return errors;
+}
+
+export async function processUpload(file, sessionId, subtitleOptions) {
+  try {
+    // Initialize progress tracking
+    ProgressTracker.updateProgress(sessionId, 0, 'Starting upload');
+
+    // Verify required files
+    const projectRoot = getProjectRoot();
+    const verificationErrors = await verifyRequiredFiles(projectRoot);
     
-    // Convert the file to a Buffer and save it to the upload directory
-    const buffer = await file.arrayBuffer();
-    await fs.writeFile(filePath, Buffer.from(buffer));
-    socket.emit('progress', { sessionId, progress: 25, message: 'File uploaded' });
-
-
-    // Process subtitles
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1800000); // 30 minute timeout
-
-    socket.emit('progress', { sessionId, progress: 50, message: 'Starting subtitle processing' });
-
-    const response = await fetch(`${baseUrl}/api/subtitles`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Session-Id': sessionId
-      },
-
-      body: JSON.stringify({ videoPath: filePath , sessionId: sessionId}),
-      signal: controller.signal
-    });
-    console.log('Subtitle processing request completed');
-
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      throw new Error('Failed to process subtitles');
+    if (verificationErrors.length > 0) {
+      throw new Error(`Setup verification failed:\n${verificationErrors.join('\n')}`);
     }
 
-    const { outputPath } = await response.json();
-    socket.emit('progress', { sessionId, progress: 100, message: 'Processing complete' });
-    return { outputPath, sessionId };
+    // Save file
+    const filePath = await FileHandler.saveFile(file, sessionId);
+    ProgressTracker.updateProgress(sessionId, 20, 'File saved');
+
+    // Process subtitles
+    await processSubtitles(filePath, sessionId, {
+      ...subtitleOptions,
+      font: 'Chantilly' // Always use Chantilly font
+    });
+
+    // Verify the processed video exists
+    const videoExists = await FileHandler.checkProcessedVideo(sessionId);
+    if (!videoExists) {
+      throw new Error('Failed to generate video with subtitles');
+    }
+
+    ProgressTracker.updateProgress(sessionId, 100, 'Complete');
+
+    return {
+      success: true,
+      outputPath: `/tmp/${sessionId}/video_with_subtitles.mp4`
+    };
 
   } catch (error) {
-    console.error('Error processing file:', error);
-    socket.emit('error', { sessionId, error: error.message });
+    console.error('Error in processUpload:', error);
+    ProgressTracker.updateProgress(sessionId, 100, `Error: ${error.message}`);
     throw error;
-  } finally {
-    socket.close();
+  }
+}
+
+/**
+ * Process the video with subtitles using the Python script
+ */
+async function processSubtitles(videoPath, sessionId, options) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Get the absolute path to the script using project root
+      const projectRoot = getProjectRoot();
+      const scriptPath = path.join(projectRoot, 'scripts', 'subtitle_generator', 'main.py');
+
+      console.log('Project root:', projectRoot);
+      console.log('Script path:', scriptPath);
+
+      // Construct the command with proper argument handling
+      const commandArgs = [
+        'python',
+        `"${scriptPath}"`,
+        'put_subtitles',
+        `"${videoPath}"`,
+        `"${sessionId}"`,
+        '--font', `"${options.font}"`,
+        '--color', `"${options.color}"`,
+        '--size', `"${options.size}"`
+      ];
+
+      // Join arguments with proper spacing and quoting
+      const command = commandArgs.join(' ');
+
+      console.log('Executing command:', command);
+      ProgressTracker.updateProgress(sessionId, 25, 'Starting subtitle generation');
+
+      // Execute the Python script with proper environment
+      const subprocess = exec(command, {
+        env: {
+          ...process.env,
+          PYTHONIOENCODING: 'utf-8',
+          SESSION_ID: sessionId,
+          PYTHONPATH: path.join(projectRoot, 'scripts', 'subtitle_generator')
+        }
+      });
+
+      let errorOutput = '';
+
+      // Handle process output
+      subprocess.stdout?.on('data', (data) => {
+        const output = data.toString();
+        console.log('Process output:', output);
+
+        // Parse progress information
+        if (output.includes('Progress:')) {
+          const match = output.match(/Progress: (\d+)%/);
+          if (match) {
+            const progress = parseInt(match[1]);
+            ProgressTracker.updateProgress(
+              sessionId,
+              25 + (progress * 0.7), // Scale progress between 25% and 95%
+              'Processing video and generating subtitles'
+            );
+          }
+        }
+      });
+
+      // Handle process errors
+      subprocess.stderr?.on('data', (data) => {
+        const error = data.toString();
+        console.error('Process error output:', error);
+        errorOutput += error;
+      });
+
+      // Handle process completion
+      subprocess.on('close', (code) => {
+        if (code === 0) {
+          ProgressTracker.updateProgress(sessionId, 95, 'Finalizing video');
+          resolve();
+        } else {
+          // Extract error message from Python output if available
+          const errorMatch = errorOutput.match(/Error: (.*?)(\n|$)/);
+          const errorMessage = errorMatch 
+            ? errorMatch[1] 
+            : `Process exited with code ${code}`;
+
+          const error = new Error(errorMessage);
+          ProgressTracker.updateProgress(sessionId, 100, `Error: ${errorMessage}`);
+          reject(error);
+        }
+      });
+
+      // Handle process errors
+      subprocess.on('error', (error) => {
+        console.error('Process error:', error);
+        ProgressTracker.updateProgress(sessionId, 100, `Error: ${error.message}`);
+        reject(error);
+      });
+
+    } catch (error) {
+      console.error('Error in processSubtitles:', error);
+      ProgressTracker.updateProgress(sessionId, 100, `Error: ${error.message}`);
+      reject(error);
+    }
+  });
+}
+
+/**
+ * Clean up resources for a session
+ */
+export async function cleanupSession(sessionId) {
+  try {
+    await FileHandler.cleanup(sessionId);
+    ProgressTracker.progressMap.delete(sessionId);
+  } catch (error) {
+    console.error(`Error cleaning up session ${sessionId}:`, error);
   }
 }
