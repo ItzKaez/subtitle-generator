@@ -13,12 +13,10 @@ import argparse
 from logger import setup_logger
 from session_manager import SessionManager
 from exceptions import (
-    FontNotFoundError, VideoProcessingError, AudioExtractionError,
-    TranscriptionError, FrameExtractionError, VideoCreationError,
-    ValidationError
+    SubtitleGeneratorError, FontNotFoundError, VideoProcessingError, 
+    AudioExtractionError, TranscriptionError, FrameExtractionError, 
+    VideoCreationError, ValidationError, SessionError
 )
-
-# ... (previous code remains the same until VideoTranscriber class) ...
 
 class VideoTranscriber:
     def __init__(self, model_path, video_path, transcription_text=None, session_id=None, font_path=None, font_size=80, text_color=(255, 255, 255)):
@@ -216,8 +214,8 @@ class VideoTranscriber:
                     if current_word:
                         frame = self.add_subtitle_to_frame(frame, current_word["text"], width, height)
 
-                    output_path = os.path.join(frames_dir, f"{frame_count:08d}.jpg")
-                    cv2.imwrite(output_path, frame)
+                    frame_path = os.path.join(frames_dir, f"{frame_count:08d}.jpg")
+                    cv2.imwrite(frame_path, frame)
                     pbar.update(1)
 
             cap.release()
@@ -252,6 +250,10 @@ class VideoTranscriber:
     def add_subtitle_to_frame(self, frame, text, width, height):
         """Add subtitle text to a video frame."""
         try:
+            # Validate font file existence
+            if not os.path.exists(self.font_path):
+                raise FontNotFoundError(self.font_path)
+                
             image_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             draw = ImageDraw.Draw(image_pil)
             font = ImageFont.truetype(self.font_path, self.font_size)
@@ -275,74 +277,83 @@ class VideoTranscriber:
             draw.text((x, y), text, font=font, fill=self.text_color)
             
             return cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
+        except FontNotFoundError:
+            raise
         except Exception as e:
             raise VideoProcessingError(f"Error adding subtitle to frame: {str(e)}")
 
-
-def put_subtitles(video_path, transcription_text=None, session_id=None, font_name='Chantilly', color_name='white', size_name='medium'):
-    """
-    Main function to add subtitles to a video.
-    """
-    logger = setup_logger(session_id or 'default_session')
-    logger.info("Starting subtitle generation process...")
-    
+def validate_color(color_str):
+    """Validate and convert color string to RGB tuple."""
     try:
-        # Validate inputs
-        if not os.path.exists(video_path):
-            raise ValidationError("Video file not found", "video_path")
-        
-        # Get font and color configurations
-        font_path, font_size = get_font_config(font_name, size_name)
-        text_color = get_color_config(color_name)
-        
-        # Setup paths
-        model_path = "base"
-        output_video_path = f"public/tmp/{session_id}/video_with_subtitles.mp4"
-        
-        # Process video
-        transcriber = VideoTranscriber(
-            model_path=model_path,
-            video_path=video_path,
-            transcription_text=transcription_text,
-            session_id=session_id,
-            font_path=font_path,
-            font_size=font_size,
-            text_color=text_color
-        )
-        
-        transcriber.extract_audio()
-        transcriber.transcribe_video()
-        transcriber.create_video(output_video_path)
-        
-        logger.info("Subtitle generation completed successfully")
-        return output_video_path
-        
-    except Exception as e:
-        logger.error(f"Error in subtitle generation: {str(e)}")
-        raise
+        r, g, b = map(int, color_str.split(','))
+        if not all(0 <= c <= 255 for c in (r, g, b)):
+            raise ValueError
+        return (r, g, b)
+    except ValueError:
+        raise ValidationError("Invalid color format. Use 'R,G,B' format with values between 0-255")
+
+def validate_model(model_name):
+    """Validate whisper model name."""
+    valid_models = ['tiny', 'base', 'small', 'medium', 'large']
+    if model_name not in valid_models:
+        raise ValidationError(f"Invalid model name. Choose from: {', '.join(valid_models)}")
+    return model_name
+
+def validate_files(video_path, font_path=None):
+    """Validate existence of input files."""
+    if not os.path.exists(video_path):
+        raise ValidationError(f"Video file not found: {video_path}")
+    if font_path and not os.path.exists(font_path):
+        raise ValidationError(f"Font file not found: {font_path}")
 
 def main():
+    """Main execution function."""
+    parser = argparse.ArgumentParser(description="Generate subtitled video using Whisper transcription")
+    parser.add_argument("--model_path", required=True, help="Whisper model name (tiny, base, small, medium, large)")
+    parser.add_argument("--video_path", required=True, help="Path to input video file")
+    parser.add_argument("--output_path", required=True, help="Path for output video file")
+    parser.add_argument("--transcription_text", help="Optional transcription text")
+    parser.add_argument("--session_id", help="Session identifier")
+    parser.add_argument("--font_path", help="Path to font file")
+    parser.add_argument("--font_size", type=int, default=80, help="Font size for subtitles")
+    parser.add_argument("--text_color", default="255,255,255", help="Subtitle text color (R,G,B)")
+
+    args = parser.parse_args()
+
     try:
-        args = parse_arguments()
-        
-        if args.command == 'put_subtitles':
-            # Set session ID as environment variable
-            os.environ['SESSION_ID'] = args.session_id
-            
-            output_path = put_subtitles(
-                args.video_path,
-                args.transcription,
-                args.session_id,
-                args.font,
-                args.color,
-                args.size
-            )
-            print(f"Successfully generated video with subtitles: {output_path}")
-            sys.exit(0)
-            
-    except Exception as e:
-        print(f"Error: {str(e)}", file=sys.stderr)
+        # Validate inputs
+        validate_model(args.model_path)
+        validate_files(args.video_path, args.font_path)
+        text_color = validate_color(args.text_color)
+
+        # Initialize transcriber
+        transcriber = VideoTranscriber(
+            model_path=args.model_path,
+            video_path=args.video_path,
+            transcription_text=args.transcription_text,
+            session_id=args.session_id,
+            font_path=args.font_path,
+            font_size=args.font_size,
+            text_color=text_color
+        )
+
+        # Process video
+        transcriber.extract_audio()
+        transcriber.transcribe_video()
+        transcriber.create_video(args.output_path)
+
+        print(f"\nSuccess! Subtitled video saved to: {args.output_path}")
+
+    except SubtitleGeneratorError as e:
+        print(f"\nError: {str(e)}", file=sys.stderr)
         sys.exit(1)
+    except Exception as e:
+        print(f"\nUnexpected error: {str(e)}", file=sys.stderr)
+        sys.exit(1)
+    finally:
+        # Cleanup any remaining temporary files
+        if 'transcriber' in locals():
+            transcriber.session_manager.cleanup_session()
 
 if __name__ == "__main__":
     main()

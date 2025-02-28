@@ -69,7 +69,7 @@ export async function processUpload(file, sessionId, subtitleOptions) {
 
     return {
       success: true,
-      outputPath: `/tmp/${sessionId}/video_with_subtitles.mp4`
+      outputPath: path.join('public', 'tmp', sessionId, 'video_with_subtitles.mp4')
     };
 
   } catch (error) {
@@ -93,15 +93,38 @@ async function processSubtitles(videoPath, sessionId, options) {
       console.log('Script path:', scriptPath);
 
       // Construct the command with proper argument handling
+      const outputPath = path.join(process.cwd(), 'public', 'tmp', sessionId, 'video_with_subtitles.mp4');
+      const fontPath = path.join(projectRoot, 'src', 'chantilly.TTF');
+      
+      // Convert text size to pixel values
+      const fontSizeMap = {
+        'small': 60,
+        'medium': 80,
+        'large': 100
+      };
+      
+      // Convert color names to RGB values
+      const colorMap = {
+        'white': '255,255,255',
+        'yellow': '255,255,0',
+        'red': '255,0,0',
+        'blue': '0,0,255',
+        'green': '0,255,0'
+      };
+
+      const fontSize = fontSizeMap[options.size] || 80;  // default to medium (80) if invalid
+      const textColor = colorMap[options.color] || '255,255,255';  // default to white if invalid
+      
       const commandArgs = [
         'python',
         `"${scriptPath}"`,
-        'put_subtitles',
-        `"${videoPath}"`,
-        `"${sessionId}"`,
-        '--font', `"${options.font}"`,
-        '--color', `"${options.color}"`,
-        '--size', `"${options.size}"`
+        '--model_path', 'base',
+        '--video_path', `"${videoPath}"`,
+        '--output_path', `"${outputPath}"`,
+        '--session_id', `"${sessionId}"`,
+        '--font_path', `"${fontPath}"`,
+        '--font_size', `${fontSize}`,
+        '--text_color', `"${textColor}"`
       ];
 
       // Join arguments with proper spacing and quoting
