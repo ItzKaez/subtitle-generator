@@ -12,13 +12,13 @@ const VideoPreview = ({
   hideSubtitleOverlay = false,
 }) => {
   const videoRef = useRef(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const titleRef = useRef(null);
-
+  const [isLoading, setIsLoading] = useState(true);
+  const titleRef = useRef(null);
   const [error, setError] = useState(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState('16/9');
 
   useEffect(() => {
     if (src) {
@@ -30,10 +30,14 @@ const VideoPreview = ({
   const handleLoadedData = () => {
     setIsLoading(false);
     setDuration(videoRef.current.duration);
+    
+    // Calculate aspect ratio
+    const video = videoRef.current;
+    const ratio = video.videoWidth / video.videoHeight;
+    setAspectRatio(ratio > 1 ? '16/9' : '9/16');
+    
     if (onLoad) onLoad();
     titleRef.current.scrollIntoView({ behavior: 'smooth' });
-
-
   };
 
   const handleError = (e) => {
@@ -73,121 +77,82 @@ const VideoPreview = ({
     }
   };
 
-  // Map subtitle size to Tailwind text sizes
-  const getTextSizeClass = (size) => {
-    const sizeMap = {
-      small: "text-lg",
-      medium: "text-xl",
-      large: "text-2xl",
-      "x-large": "text-3xl",
-    };
-    return sizeMap[size] || "text-xl";
-  };
-
-  // Map subtitle color to Tailwind text colors
-  const getTextColorClass = (color) => {
-    const colorMap = {
-      white: "text-white",
-      yellow: "text-yellow-400",
-      green: "text-green-400",
-      cyan: "text-cyan-400",
-      pink: "text-pink-400",
-    };
-    return colorMap[color] || "text-white";
-  };
-
-  // Get font class
-  const getFontClass = (font) => {
-    return `font-${font.toLowerCase().replace(/\s+/g, "-")}`;
-  };
-
   return (
     <div className="w-full space-y-4">
-      <h2 ref={titleRef} className="text-2xl font-bold mb-4">Preview</h2>
+      <span ref={titleRef}></span>
 
+      {/* Video Container with dynamic aspect ratio and reduced size */}
+      <div className="flex max-h-[500px] justify-center">
+        <div className={`relative bg-gray-900 rounded-lg overflow-hidden
+          ${aspectRatio === '16/9' 
+            ? 'w-full max-w-[640px] aspect-video' 
+            : 'w-full max-w-[360px] aspect-[9/16]'}`
+        }>
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#FF7B7B] border-t-transparent"></div>
+            </div>
+          )}
 
-      {/* Video Container */}
-      <div className="relative w-full aspect-video bg-gray-900 rounded-lg overflow-hidden">
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#FF7B7B] border-t-transparent"></div>
-          </div>
-        )}
+          {error && (
+            <div className="absolute inset-0 flex items-center justify-center text-red-400">
+              {error}
+            </div>
+          )}
 
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center text-red-400">
-            {error}
-          </div>
-        )}
+          <video
+            ref={videoRef}
+            className="w-full max-h-[500px] object-contain"
+            src={src}
+            onLoadedData={handleLoadedData}
+            onError={handleError}
+            onTimeUpdate={handleTimeUpdate}
+            onClick={togglePlay}
+          />
 
-        <video
-          ref={videoRef}
-          className="w-full h-full"
-          src={src}
-          onLoadedData={handleLoadedData}
-          onError={handleError}
-          onTimeUpdate={handleTimeUpdate}
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            togglePlay();
-          }}
-        />
+          {/* Subtitle Overlay */}
+          {!isLoading && !error && !hideSubtitleOverlay && (
+            <div className="absolute bottom-20 left-0 right-0 flex justify-center pointer-events-none">
+              <div className="px-4 py-2 rounded-lg bg-black/40 backdrop-blur-sm text-xl text-white text-center max-w-[80%] transition-all duration-200">
+                {subtitleText}
+              </div>
+            </div>
+          )}
 
-        {/* Subtitle Overlay */}
-        {!isLoading && !error && !hideSubtitleOverlay && (
-          <div className="absolute bottom-20 left-0 right-0 flex justify-center pointer-events-none">
+          {/* Play/Pause Button Overlay */}
+          <button
+            onClick={togglePlay}
+            className={`
+              absolute inset-0 flex items-center justify-center
+              bg-black/0 hover:bg-black/30 transition-colors duration-200
+              ${isLoading ? "hidden" : ""}
+            `}
+          >
             <div
               className={`
-              px-4 py-2 rounded-lg bg-black/40 backdrop-blur-sm
-              ${getTextSizeClass(subtitleOptions.size)}
-              ${getTextColorClass(subtitleOptions.color)}
-              ${getFontClass(subtitleOptions.font)}
-              text-center max-w-[80%] transition-all duration-200
+              w-16 h-16 rounded-full bg-black/50 flex items-center justify-center
+              transform transition-transform duration-200
+              ${isPlaying ? "scale-0" : "scale-100"}
             `}
             >
-              {subtitleText}
+              <svg
+                className="w-8 h-8 text-white"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                {isPlaying ? (
+                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                ) : (
+                  <path d="M8 5v14l11-7z" />
+                )}
+              </svg>
             </div>
-          </div>
-        )}
-
-        {/* Play/Pause Button Overlay */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            togglePlay();
-          }}
-          className={`
-            absolute inset-0 flex items-center justify-center
-            bg-black/0 hover:bg-black/30 transition-colors duration-200
-            ${isLoading ? "hidden" : ""}
-          `}
-        >
-          <div
-            className={`
-            w-16 h-16 rounded-full bg-black/50 flex items-center justify-center
-            transform transition-transform duration-200
-            ${isPlaying ? "scale-0" : "scale-100"}
-          `}
-          >
-            <svg
-              className="w-8 h-8 text-white"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              {isPlaying ? (
-                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-              ) : (
-                <path d="M8 5v14l11-7z" />
-              )}
-            </svg>
-          </div>
-        </button>
+          </button>
+        </div>
       </div>
 
       {/* Video Controls */}
-      <div className="space-y-2">
+      <div className={`space-y-2 ${aspectRatio === '16/9' ? 'max-w-[640px]' : 'max-w-[360px]'} mx-auto`}>
         {/* Progress Bar */}
         <input
           type="range"

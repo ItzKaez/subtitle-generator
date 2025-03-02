@@ -1,90 +1,75 @@
 'use client';
 
+const STYLE_PRESETS = {
+  default: {
+    name: "Default Style",
+    description: "Classic white text with black outline",
+    preview: "White on Black"
+  },
+  modern: {
+    name: "Modern Style",
+    description: "White text with navy blue outline",
+    preview: "White on Navy"
+  },
+  fancy: {
+    name: "Fancy Style",
+    description: "Gold text with brown outline",
+    preview: "Gold on Brown"
+  },
+  retro: {
+    name: "Retro Style",
+    description: "Light coral text with slate outline",
+    preview: "Coral on Slate"
+  }
+};
+
 const SubtitleOptions = ({ options = {}, onChange, disabled }) => {
-  const {
-    font = 'Arial',
-    color = 'white',
-    size = 'medium'
-  } = options;
+  const { stylePreset = 'default' } = options;
+
+  // Handle style preset change
+  const handlePresetChange = (e, preset) => {
+    e.preventDefault();
+    onChange({ 
+      ...options, 
+      stylePreset: preset
+    });
+  };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-
-
-      {/* Font Selection */}
+    <div className="space-y-6 w-full">
+      {/* Style Preset Selection */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-300">
-          Font Style
+          Subtitle Style
         </label>
-        <select
-          value={font}
-          onChange={(e) => onChange({ ...options, font: e.target.value })}
-          disabled={disabled}
-          className={`
-            w-full px-3 py-2 rounded-lg
-            ${disabled ? 'bg-gray-700 cursor-not-allowed' : 'bg-gray-800 hover:bg-gray-700'}
-            border border-gray-600 focus:border-[#FF7B7B]
-            text-gray-200 focus:outline-none
-            transition-colors duration-200
-          `}
-        >
-          <option value="Arial">Arial</option>
-          <option value="Helvetica">Helvetica</option>
-          <option value="Chantilly">Chantilly</option>
-          <option value="Times New Roman">Times New Roman</option>
-          <option value="Verdana">Verdana</option>
-        </select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {Object.entries(STYLE_PRESETS).map(([key, preset]) => (
+            <div
+              key={key}
+              onClick={(e) => handlePresetChange(e, key)}
+              className={`
+                p-4 rounded-lg text-left space-y-2 cursor-pointer
+                ${stylePreset === key ? 'ring-2 ring-[#FF7B7B]' : ''}
+                ${disabled ? 'bg-gray-700 cursor-not-allowed' : 'bg-gray-800 hover:bg-gray-700'}
+                border border-gray-600
+                transition-all duration-200
+              `}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handlePresetChange(e, key);
+                }
+              }}
+            >
+              <div className="font-medium text-gray-200">{preset.name}</div>
+              <div className="text-sm text-gray-400">{preset.description}</div>
+              <div className="text-xs text-gray-500">{preset.preview}</div>
+            </div>
+          ))}
+        </div>
       </div>
-
-      {/* Color Selection */}
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-300">
-          Text Color
-        </label>
-        <select
-          value={color}
-          onChange={(e) => onChange({ ...options, color: e.target.value })}
-          disabled={disabled}
-          className={`
-            w-full px-3 py-2 rounded-lg
-            ${disabled ? 'bg-gray-700 cursor-not-allowed' : 'bg-gray-800 hover:bg-gray-700'}
-            border border-gray-600 focus:border-[#FF7B7B]
-            text-gray-200 focus:outline-none
-            transition-colors duration-200
-          `}
-        >
-          <option value="white">White</option>
-          <option value="yellow">Yellow</option>
-          <option value="green">Green</option>
-          <option value="cyan">Cyan</option>
-          <option value="pink">Pink</option>
-        </select>
-      </div>
-
-      {/* Size Selection */}
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-300">
-          Text Size
-        </label>
-        <select
-          value={size}
-          onChange={(e) => onChange({ ...options, size: e.target.value })}
-          disabled={disabled}
-          className={`
-            w-full px-3 py-2 rounded-lg
-            ${disabled ? 'bg-gray-700 cursor-not-allowed' : 'bg-gray-800 hover:bg-gray-700'}
-            border border-gray-600 focus:border-[#FF7B7B]
-            text-gray-200 focus:outline-none
-            transition-colors duration-200
-          `}
-        >
-          <option value="small">Small</option>
-          <option value="medium">Medium</option>
-          <option value="large">Large</option>
-          <option value="x-large">Extra Large</option>
-        </select>
-      </div>
-
     </div>
   );
 };

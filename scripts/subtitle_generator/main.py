@@ -18,8 +18,59 @@ from exceptions import (
     VideoCreationError, ValidationError, SessionError
 )
 
+# Define subtitle styling options
+SUBTITLE_STYLES = {
+    "default": {
+        "font_path": "src/chantilly.TTF",
+        "font_size": 80,
+        "text_color": (255, 255, 255),     # White
+        "outline_color": (0, 0, 0),        # Black
+        "outline_thickness": 3,
+        "position_offset": 20,             # Offset from center
+        "background_color": (0, 0, 0, 128), # Semi-transparent black
+        "background_padding": (20, 10),     # Horizontal and vertical padding
+    },
+    "modern": {
+        "font_path": "src/chantilly.TTF",
+        "font_size": 90,
+        "text_color": (255, 255, 255),     # White
+        "outline_color": (0, 0, 128),      # Navy Blue
+        "outline_thickness": 4,
+        "position_offset": 25,
+        "background_color": (0, 0, 128, 100),
+        "background_padding": (25, 12),
+    },
+    "fancy": {
+        "font_path": "src/chantilly.TTF",
+        "font_size": 85,
+        "text_color": (255, 215, 0),       # Gold
+        "outline_color": (139, 69, 19),    # Brown
+        "outline_thickness": 5,
+        "position_offset": 22,
+        "background_color": (139, 69, 19, 90),
+        "background_padding": (22, 11),
+    },
+    "retro": {
+        "font_path": "src/chantilly.TTF",
+        "font_size": 75,
+        "text_color": (255, 160, 122),     # Light Coral
+        "outline_color": (47, 79, 79),     # Dark Slate Gray
+        "outline_thickness": 4,
+        "position_offset": 18,
+        "background_color": (47, 79, 79, 110),
+        "background_padding": (18, 9),
+    }
+}
+
+def validate_style_preset(preset_name):
+    """Validate and return the style preset configuration."""
+    if preset_name not in SUBTITLE_STYLES:
+        valid_presets = ", ".join(SUBTITLE_STYLES.keys())
+        raise ValidationError(f"Invalid style preset. Available presets: {valid_presets}")
+    return SUBTITLE_STYLES[preset_name]
+
 class VideoTranscriber:
-    def __init__(self, model_path, video_path, transcription_text=None, session_id=None, font_path=None, font_size=80, text_color=(255, 255, 255)):
+    def __init__(self, model_path, video_path, transcription_text=None, session_id=None, style_preset="default"):
         self.session_id = session_id or 'default_session'
         self.logger = setup_logger(self.session_id)
         self.session_manager = SessionManager(self.session_id)
@@ -31,16 +82,16 @@ class VideoTranscriber:
             self.word_timings = []
             self.fps = 0
             self.transcription_words = self.load_transcription(transcription_text) if transcription_text else []
-            self.font_path = font_path
-            self.font_size = font_size
-            self.text_color = text_color
+            
+            # Initialize style options from preset
+            self.style_options = validate_style_preset(style_preset)
+            
+            self.logger.info(f"VideoTranscriber initialized with video: {video_path} and style preset: {style_preset}")
             
             # Setup session directories
             if not self.session_manager.setup_session():
                 raise SessionError("Failed to setup session directories", self.session_id)
                 
-            self.logger.info(f"VideoTranscriber initialized with video: {video_path}")
-            
         except Exception as e:
             raise VideoProcessingError(f"Error initializing VideoTranscriber: {str(e)}")
 
@@ -248,49 +299,68 @@ class VideoTranscriber:
             raise VideoCreationError(f"Error creating video: {str(e)}")
 
     def add_subtitle_to_frame(self, frame, text, width, height):
-        """Add subtitle text to a video frame."""
+        """Add subtitle text to a video frame using style options."""
         try:
             # Validate font file existence
-            if not os.path.exists(self.font_path):
-                raise FontNotFoundError(self.font_path)
+            if not os.path.exists(self.style_options['font_path']):
+                raise FontNotFoundError(self.style_options['font_path'])
                 
             image_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             draw = ImageDraw.Draw(image_pil)
-            font = ImageFont.truetype(self.font_path, self.font_size)
+            
+            # Load font with preset size
+            font = ImageFont.truetype(
+                self.style_options['font_path'], 
+                self.style_options['font_size']
+            )
             
             # Calculate text position
             text_bbox = draw.textbbox((0, 0), text, font=font)
             text_width = text_bbox[2] - text_bbox[0]
             text_height = text_bbox[3] - text_bbox[1]
             x = (width - text_width) // 2
-            y = ((height - text_height) // 2) + 100  # Position slightly under center
+            y = ((height - text_height) // 2) + self.style_options['position_offset']
             
-            # Draw outline
-            outline_color = (0, 0, 0)  # Black outline
-            outline_thickness = 3
+            # Draw background if specified
+            if self.style_options['background_color']:
+                bg_color = self.style_options['background_color']
+                padding_x, padding_y = self.style_options['background_padding']
+                bg_bbox = [
+                    x - padding_x,
+                    y - padding_y,
+                    x + text_width + padding_x,
+                    y + text_height + padding_y
+                ]
+                draw.rectangle(bg_bbox, fill=bg_color)
+            
+            # Draw outline using preset style
+            outline_thickness = self.style_options['outline_thickness']
+            outline_color = self.style_options['outline_color']
+            
             for dx in range(-outline_thickness, outline_thickness + 1):
                 for dy in range(-outline_thickness, outline_thickness + 1):
                     if dx != 0 or dy != 0:
-                        draw.text((x + dx, y + dy), text, font=font, fill=outline_color)
+                        draw.text(
+                            (x + dx, y + dy), 
+                            text, 
+                            font=font, 
+                            fill=outline_color
+                        )
             
-            # Draw main text
-            draw.text((x, y), text, font=font, fill=self.text_color)
+            # Draw main text with preset color
+            draw.text(
+                (x, y), 
+                text, 
+                font=font, 
+                fill=self.style_options['text_color']
+            )
             
             return cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
+            
         except FontNotFoundError:
             raise
         except Exception as e:
             raise VideoProcessingError(f"Error adding subtitle to frame: {str(e)}")
-
-def validate_color(color_str):
-    """Validate and convert color string to RGB tuple."""
-    try:
-        r, g, b = map(int, color_str.split(','))
-        if not all(0 <= c <= 255 for c in (r, g, b)):
-            raise ValueError
-        return (r, g, b)
-    except ValueError:
-        raise ValidationError("Invalid color format. Use 'R,G,B' format with values between 0-255")
 
 def validate_model(model_name):
     """Validate whisper model name."""
@@ -299,12 +369,10 @@ def validate_model(model_name):
         raise ValidationError(f"Invalid model name. Choose from: {', '.join(valid_models)}")
     return model_name
 
-def validate_files(video_path, font_path=None):
+def validate_files(video_path):
     """Validate existence of input files."""
     if not os.path.exists(video_path):
         raise ValidationError(f"Video file not found: {video_path}")
-    if font_path and not os.path.exists(font_path):
-        raise ValidationError(f"Font file not found: {font_path}")
 
 def main():
     """Main execution function."""
@@ -314,17 +382,16 @@ def main():
     parser.add_argument("--output_path", required=True, help="Path for output video file")
     parser.add_argument("--transcription_text", help="Optional transcription text")
     parser.add_argument("--session_id", help="Session identifier")
-    parser.add_argument("--font_path", help="Path to font file")
-    parser.add_argument("--font_size", type=int, default=80, help="Font size for subtitles")
-    parser.add_argument("--text_color", default="255,255,255", help="Subtitle text color (R,G,B)")
+    parser.add_argument("--style_preset", default="default", 
+                      help=f"Preset style for subtitles. Options: {', '.join(SUBTITLE_STYLES.keys())}")
 
     args = parser.parse_args()
 
     try:
         # Validate inputs
         validate_model(args.model_path)
-        validate_files(args.video_path, args.font_path)
-        text_color = validate_color(args.text_color)
+        validate_files(args.video_path)
+        validate_style_preset(args.style_preset)
 
         # Initialize transcriber
         transcriber = VideoTranscriber(
@@ -332,9 +399,7 @@ def main():
             video_path=args.video_path,
             transcription_text=args.transcription_text,
             session_id=args.session_id,
-            font_path=args.font_path,
-            font_size=args.font_size,
-            text_color=text_color
+            style_preset=args.style_preset
         )
 
         # Process video

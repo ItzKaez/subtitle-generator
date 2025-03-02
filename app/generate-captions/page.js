@@ -2,27 +2,33 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import NavBar from "@/components/NavBar";
-import Footer from "@/components/Footer";
-import ProgressBar from "@/components/ProgressBar";
-import SubtitleOptions from "@/components/SubtitleOptions";
-import VideoPreview from "@/components/VideoPreview";
+import NavBar from "../../components/NavBar";
+import Footer from "../../components/Footer";
+import ProgressBar from "../../components/ProgressBar";
+import SubtitleOptions from "../../components/SubtitleOptions";
+import VideoPreview from "../../components/VideoPreview";
 
 export default function GenerateCaptions() {
   const router = useRouter();
+
+  // File and session state
   const [file, setFile] = useState(null);
   const [fileName, setFileName] = useState("");
   const [sessionId, setSessionId] = useState("");
+
+  // Upload and processing state
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+
+  // Video preview state
   const [processedVideoUrl, setProcessedVideoUrl] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
+
+  // Subtitle options state
   const [subtitleOptions, setSubtitleOptions] = useState({
-    font: "Arial",
-    color: "white",
-    size: "medium",
+    stylePreset: "default",
   });
 
   // Generate session ID on component mount
@@ -115,9 +121,7 @@ export default function GenerateCaptions() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("sessionId", sessionId);
-      formData.append("subtitleFont", subtitleOptions.font);
-      formData.append("subtitleColor", subtitleOptions.color);
-      formData.append("subtitleSize", subtitleOptions.size);
+      formData.append("subtitleOptions", JSON.stringify(subtitleOptions));
 
       const response = await fetch("/api/upload", {
         method: "POST",
@@ -167,7 +171,7 @@ export default function GenerateCaptions() {
       <NavBar />
 
       <main className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto space-y-8">
+        <div className="max-w-7xl mx-auto space-y-8">
           {/* Header */}
           <div className="text-center">
             <h1 className="text-4xl font-bold mb-4">Generate Video Captions</h1>
@@ -184,63 +188,65 @@ export default function GenerateCaptions() {
           )}
 
           <form onSubmit={handleUpload} className="space-y-6">
-            {/* File Upload Area */}
-            <div
-              className={`
-                w-full h-48 border-3 border-dashed rounded-2xl
-                ${
-                  isUploading
-                    ? "border-[#FF5F5F]"
-                    : "border-gray-600 hover:border-[#FF7B7B]"
+            {/* Initial Upload Area */}
+            {!previewUrl && !processedVideoUrl && (
+              <div
+                className={`
+                  w-full h-48 border-3 border-dashed rounded-2xl
+                  ${
+                    isUploading
+                      ? "border-[#FF5F5F]"
+                      : "border-gray-600 hover:border-[#FF7B7B]"
+                  }
+                  transition-all duration-300
+                  flex flex-col items-center justify-center
+                  bg-gray-800/50 cursor-pointer
+                  relative
+                `}
+                onClick={() =>
+                  !isUploading && document.getElementById("fileInput").click()
                 }
-                transition-all duration-300
-                flex flex-col items-center justify-center
-                bg-gray-800/50 cursor-pointer
-                relative
-              `}
-              onClick={() =>
-                !isUploading && document.getElementById("fileInput").click()
-              }
-              onDrop={(e) => {
-                e.preventDefault();
-                if (!isUploading) {
-                  handleFileSelect(e.dataTransfer.files[0]);
-                }
-              }}
-              onDragOver={(e) => e.preventDefault()}
-            >
-              {/* Upload Icon */}
-              <svg
-                className={`w-12 h-12 mb-4 ${
-                  isUploading ? "text-[#FF7B7B]" : "text-gray-500"
-                }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (!isUploading) {
+                    handleFileSelect(e.dataTransfer.files[0]);
+                  }
+                }}
+                onDragOver={(e) => e.preventDefault()}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                {/* Upload Icon */}
+                <svg
+                  className={`w-12 h-12 mb-4 ${
+                    isUploading ? "text-[#FF7B7B]" : "text-gray-500"
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                  />
+                </svg>
+
+                <p className="text-gray-400">
+                  {file
+                    ? fileName
+                    : "Drag and drop your video here or click to browse"}
+                </p>
+
+                <input
+                  id="fileInput"
+                  type="file"
+                  accept="video/*"
+                  className="hidden"
+                  onChange={(e) => handleFileSelect(e.target.files[0])}
+                  disabled={isUploading}
                 />
-              </svg>
-
-              <p className="text-gray-400">
-                {file
-                  ? fileName
-                  : "Drag and drop your video here or click to browse"}
-              </p>
-
-              <input
-                id="fileInput"
-                type="file"
-                accept="video/*"
-                className="hidden"
-                onChange={(e) => handleFileSelect(e.target.files[0])}
-                disabled={isUploading}
-              />
-            </div>
+              </div>
+            )}
 
             {/* Progress Bar */}
             {isUploading && (
@@ -251,87 +257,107 @@ export default function GenerateCaptions() {
               />
             )}
 
-            {/* Preview Section */}
+            {/* Preview and Options Section */}
             {(previewUrl || processedVideoUrl) && (
-              <div className="mt-8">
+              <>
+
+                {/* Two column layout during style selection */}
                 {previewUrl && !processedVideoUrl && !isUploading && (
-                  <VideoPreview
-                    src={previewUrl}
-                    subtitleOptions={subtitleOptions}
-                    onError={() => setError("Failed to load video preview")}
-                    isUploading={isUploading}
-                  />
+                  <>
+                  <h2 className="text-2xl ml-36 font-bold mb-4">Preview</h2>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Left Side - Video Preview */}
+                    <div className="w-full">
+                      <div className=" mx-auto">
+                        <VideoPreview
+                          src={previewUrl}
+                          subtitleOptions={subtitleOptions}
+                          onError={() =>
+                            setError("Failed to load video preview")
+                          }
+                          isUploading={isUploading}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right Side - Subtitle Options and Primary Button */}
+                    <div className="w-full mt-20 space-y-6">
+                      <div className="p-6 bg-gray-900 rounded-lg shadow-md">
+                        <SubtitleOptions
+                          options={subtitleOptions}
+                          onChange={setSubtitleOptions}
+                          disabled={isUploading}
+                        />
+                      </div>
+
+                      {/* Primary Action Button */}
+                      <button
+                        type="submit"
+                        disabled={!file || isUploading}
+                        className={`
+                          w-full px-8 py-3 rounded-xl font-medium
+                          ${
+                            !file || isUploading
+                              ? "bg-gray-600 cursor-not-allowed"
+                              : "bg-[#FF7B7B] hover:bg-[#FF5F5F] transform hover:scale-105"
+                          }
+                          transition-all duration-300
+                        `}
+                      >
+                        {isUploading ? "Processing..." : "Generate Subtitles"}
+                      </button>
+                    </div>
+                  </div>
+                  </>
                 )}
+
+                {/* Centered layout after processing */}
                 {processedVideoUrl && (
-                  <VideoPreview
-                    src={processedVideoUrl}
-                    subtitleOptions={subtitleOptions}
-                    onError={() => setError("Failed to load video preview")}
-                    isUploading={isUploading}
-                    hideSubtitleOverlay={true}
-                  />
-                )}
-                {previewUrl && !processedVideoUrl && !isUploading && (
-                  <div className="mt-4 p-4 bg-gray-900 rounded-lg shadow-md">
-                    <SubtitleOptions
-                      options={subtitleOptions} // Ensure this is passed correctly
-                      onChange={setSubtitleOptions} // Ensure onChange is correctly set
-                      disabled={isUploading} // Pass the disabled state if needed
+
+                  <div className="max-w-[500px] mx-auto space-y-6">
+                  <h2 className="text-2xl ml-16 font-bold mb-4">Preview</h2>
+
+                    {/* Centered Video Preview */}
+                    <VideoPreview
+                      src={processedVideoUrl}
+                      subtitleOptions={subtitleOptions}
+                      onError={() => setError("Failed to load video preview")}
+                      isUploading={isUploading}
+                      hideSubtitleOverlay={true}
                     />
+
+                    {/* Download Button */}
+                    <button
+                      type="button"
+                      onClick={handleDownload}
+                      className="
+                        w-full px-8 py-3 rounded-xl font-medium
+                        bg-[#FF7B7B] hover:bg-[#FF5F5F]
+                        transform hover:scale-105
+                        transition-all duration-300
+                        flex items-center justify-center gap-2
+                      "
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                        />
+                      </svg>
+                      Download Video
+                    </button>
                   </div>
                 )}
-              </div>
+              </>
             )}
-
-            {/* Action Buttons */}
-            <div className="flex justify-center gap-4">
-              {!processedVideoUrl && (
-                <button
-                  type="submit"
-                  disabled={!file || isUploading}
-                  className={`
-                    px-8 py-3 rounded-xl font-medium
-                    ${
-                      !file || isUploading
-                        ? "bg-gray-600 cursor-not-allowed"
-                        : "bg-[#FF7B7B] hover:bg-[#FF5F5F] transform hover:scale-105"
-                    }
-                    transition-all duration-300
-                  `}
-                >
-                  {isUploading ? "Processing..." : "Generate Subtitles"}
-                </button>
-              )}
-
-              {processedVideoUrl && (
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  className="
-                    px-8 py-3 rounded-xl font-medium
-                    bg-[#FF7B7B] hover:bg-[#FF5F5F]
-                    transform hover:scale-105
-                    transition-all duration-300
-                    flex items-center gap-2
-                  "
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                    />
-                  </svg>
-                  Download Video
-                </button>
-              )}
-            </div>
           </form>
         </div>
       </main>

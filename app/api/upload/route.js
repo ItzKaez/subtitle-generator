@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { processUpload } from './worker';
-import { FileHandler, ProgressTracker } from '@/app/utils/fileHandler';
+import { FileHandler, ProgressTracker } from '../../utils/fileHandler';
 
 // POST handler for file uploads
 export async function POST(request) {
@@ -8,11 +8,16 @@ export async function POST(request) {
     const formData = await request.formData();
     const file = formData.get('file');
     const sessionId = formData.get('sessionId');
-    const subtitleOptions = {
-      font: formData.get('subtitleFont') || 'Arial',
-      color: formData.get('subtitleColor') || 'white',
-      size: formData.get('subtitleSize') || 'medium'
-    };
+    
+    // Get subtitle options from form data and parse it
+    const subtitleOptionsStr = formData.get('subtitleOptions');
+    let subtitleOptions;
+    try {
+      subtitleOptions = subtitleOptionsStr ? JSON.parse(subtitleOptionsStr) : { stylePreset: 'default' };
+    } catch (e) {
+      console.error('Error parsing subtitle options:', e);
+      subtitleOptions = { stylePreset: 'default' };
+    }
 
     // Validate request
     if (!file) {
