@@ -263,7 +263,7 @@ class VideoTranscriber:
             text_width = text_bbox[2] - text_bbox[0]
             text_height = text_bbox[3] - text_bbox[1]
             x = (width - text_width) // 2
-            y = height - text_height - 50  # Position above bottom
+            y = ((height - text_height) // 2) + 100  # Position slightly under center
             
             # Draw outline
             outline_color = (0, 0, 0)  # Black outline
